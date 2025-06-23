@@ -56,15 +56,21 @@ const getOpenDays = (startDate, totalDays) => {
 }
 
 // Path to cache file: use /tmp in Netlify, local dir in dev
-const CACHE_FILE_PATH = process.env.NETLIFY ? '/tmp/cache.json' : path.join(process.cwd(), 'cache.json')
+// Check multiple environment indicators for Netlify
+const isNetlify = process.env.NETLIFY || process.env.NETLIFY_BUILD_BASE || process.env.AWS_LAMBDA_FUNCTION_NAME
+const CACHE_FILE_PATH = isNetlify ? '/tmp/cache.json' : path.join(process.cwd(), 'cache.json')
 
 // Helper to write cache to file
 function writeCacheToFile(data) {
   try {
+    console.log(`auto-check: Attempting to write cache to: ${CACHE_FILE_PATH}`)
     fs.writeFileSync(CACHE_FILE_PATH, JSON.stringify(data, null, 2), 'utf-8')
-    console.log('auto-check: Cache written to file')
+    console.log('auto-check: Cache successfully written to file')
   } catch (err) {
-    console.error('Failed to write cache file:', err)
+    console.error('auto-check: Failed to write cache file:', err)
+    console.error('auto-check: Cache file path was:', CACHE_FILE_PATH)
+    console.error('auto-check: Environment check - NETLIFY:', process.env.NETLIFY)
+    console.error('auto-check: Environment check - AWS_LAMBDA:', process.env.AWS_LAMBDA_FUNCTION_NAME)
   }
 }
 

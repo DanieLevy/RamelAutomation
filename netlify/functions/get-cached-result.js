@@ -1,16 +1,23 @@
 const fs = require('fs')
 const path = require('path')
 
-const CACHE_FILE_PATH = process.env.NETLIFY ? '/tmp/cache.json' : path.join(process.cwd(), 'cache.json')
+// Check multiple environment indicators for Netlify
+const isNetlify = process.env.NETLIFY || process.env.NETLIFY_BUILD_BASE || process.env.AWS_LAMBDA_FUNCTION_NAME
+const CACHE_FILE_PATH = isNetlify ? '/tmp/cache.json' : path.join(process.cwd(), 'cache.json')
 
 function readCacheFromFile() {
   try {
+    console.log(`get-cached-result: Checking cache file at: ${CACHE_FILE_PATH}`)
     if (fs.existsSync(CACHE_FILE_PATH)) {
       const raw = fs.readFileSync(CACHE_FILE_PATH, 'utf-8')
-      return JSON.parse(raw)
+      const data = JSON.parse(raw)
+      console.log(`get-cached-result: Cache file found, timestamp: ${data.timestamp}`)
+      return data
+    } else {
+      console.log('get-cached-result: Cache file does not exist')
     }
   } catch (err) {
-    console.error('Failed to read cache file:', err)
+    console.error('get-cached-result: Failed to read cache file:', err)
   }
   return null
 }
@@ -18,8 +25,13 @@ function readCacheFromFile() {
 const CACHE_DURATION = 30 * 60 * 1000 // 30 minutes
 
 exports.handler = async (event, context) => {
+  console.log('get-cached-result: Function called')
+  console.log('get-cached-result: HTTP Method:', event.httpMethod)
+  console.log('get-cached-result: Headers:', JSON.stringify(event.headers, null, 2))
+  
   // Handle CORS preflight
   if (event.httpMethod === 'OPTIONS') {
+    console.log('get-cached-result: Handling CORS preflight')
     return {
       statusCode: 200,
       headers: {
@@ -32,7 +44,6 @@ exports.handler = async (event, context) => {
   }
   
   try {
-    console.log('get-cached-result: Function called')
     
     // Try to read from file cache first
     const fileCache = readCacheFromFile()
