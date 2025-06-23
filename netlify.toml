@@ -5,13 +5,9 @@
 [build.environment]
   NODE_VERSION = "18"
 
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
-
-[functions]
-  directory = ".netlify/functions"
+# Use Next.js plugin for automatic handling
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
 
 # Environment variables needed for deployment
 # Set these in Netlify dashboard:
