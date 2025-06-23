@@ -2,7 +2,7 @@ import { Handler } from '@netlify/functions'
 import * as fs from 'fs';
 import * as path from 'path';
 
-const CACHE_FILE_PATH = path.join(__dirname, 'cache.json');
+const CACHE_FILE_PATH = process.env.NETLIFY ? '/tmp/cache.json' : path.join(__dirname, 'cache.json');
 
 function readCacheFromFile() {
   try {

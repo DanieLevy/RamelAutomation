@@ -57,8 +57,8 @@ let lastCheckResult: {
 
 const CACHE_DURATION = 30 * 60 * 1000 // 30 minutes
 
-// Path to cache file
-const CACHE_FILE_PATH = path.join(__dirname, 'cache.json')
+// Path to cache file: use /tmp in Netlify, local dir in dev
+const CACHE_FILE_PATH = process.env.NETLIFY ? '/tmp/cache.json' : path.join(__dirname, 'cache.json')
 
 // Helper to write cache to file
 function writeCacheToFile(data: any) {
