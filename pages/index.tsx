@@ -18,6 +18,11 @@ interface ApiResponse {
     earliestAvailable: AppointmentResult | null;
     totalSlots: number;
   };
+  performance: {
+    totalTimeMs: number;
+    averageRequestTimeMs: number;
+    requestsPerSecond: number;
+  };
 }
 
 export default function Home() {
@@ -150,9 +155,13 @@ export default function Home() {
                           : 'לא נמצאו תורים זמינים'
                         }
                       </h2>
-                      <p className="text-gray-600">
-                        נבדקו {results.totalDaysChecked} ימים • סך הכל {results.summary.totalSlots} שעות זמינות
-                      </p>
+                                             <div className="text-gray-600 space-y-1">
+                         <p>נבדקו {results.totalDaysChecked} ימים • סך הכל {results.summary.totalSlots} שעות זמינות</p>
+                         <p className="text-sm">
+                           ⚡ הושלם ב-{(results.performance.totalTimeMs / 1000).toFixed(1)} שניות
+                           • {results.performance.requestsPerSecond} בקשות/שנייה
+                         </p>
+                       </div>
                     </div>
                   </div>
 
