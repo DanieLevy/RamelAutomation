@@ -195,17 +195,11 @@ async function findClosestAppointment() {
   
   console.log(`auto-check: Will check ${openDates.length} open dates`)
   
-  // Add execution time tracking
+  // Add execution time tracking (no timeout limits - let it run as long as needed)
   const startTime = Date.now()
-  const maxExecutionTime = 50 * 1000 // 50 seconds limit to avoid timeout
   
   // Check dates sequentially until we find the FIRST available appointment
   for (const date of openDates) {
-    // Check if we're approaching timeout
-    if (Date.now() - startTime > maxExecutionTime) {
-      console.log(`auto-check: Approaching timeout, stopping after ${checkedCount} checks`)
-      break
-    }
     checkedCount++
     const dateStr = formatDateIsrael(date)
     
@@ -226,10 +220,11 @@ async function findClosestAppointment() {
       }
     }
     
-    // Save progress every 3 checks and log timing
-    if (checkedCount % 3 === 0) {
+    // Save progress every 2 checks and log timing (more frequent updates)
+    if (checkedCount % 2 === 0) {
       const elapsed = Math.round((Date.now() - startTime) / 1000)
-      console.log(`auto-check: Progress: checked ${checkedCount}/${openDates.length}, elapsed: ${elapsed}s`)
+      const estimatedTotal = Math.round((elapsed / checkedCount) * openDates.length)
+      console.log(`auto-check: Progress: checked ${checkedCount}/${openDates.length}, elapsed: ${elapsed}s, estimated total: ${estimatedTotal}s`)
       const progressData = {
         timestamp: Date.now(),
         result: {
@@ -239,7 +234,8 @@ async function findClosestAppointment() {
             found: false,
             totalChecked: checkedCount,
             message: `בדקתי ${checkedCount} מתוך ${openDates.length} תאריכים - עדיין מחפש...`,
-            elapsed: elapsed
+            elapsed: elapsed,
+            estimatedTotal: estimatedTotal
           }
         }
       }
@@ -247,8 +243,8 @@ async function findClosestAppointment() {
     }
     
     // Add delay between requests to be respectful and avoid rate limiting
-    // Reduced delay for faster execution within timeout limits
-    const delay = process.env.NETLIFY_DEV ? 200 : 500 // 200ms for dev, 500ms for prod
+    // Generous delay to be respectful to the server (no time pressure now)
+    const delay = process.env.NETLIFY_DEV ? 500 : 1500 // 500ms for dev, 1.5s for prod (very respectful)
     await new Promise(resolve => setTimeout(resolve, delay))
   }
   
@@ -270,7 +266,8 @@ async function findClosestAppointment() {
 // Netlify Functions handler
 exports.handler = async (event, context) => {
   try {
-    console.log('auto-check: Function called')
+    console.log('auto-check: Function called with unlimited time (15 min timeout)')
+    console.log('auto-check: Function will run as long as needed to complete all checks')
     const result = await findClosestAppointment()
     
     // Store result with timestamp

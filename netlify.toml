@@ -20,7 +20,7 @@
 
 # Auto-check function configuration
 [functions."auto-check"]
-  timeout = 60   # 60 seconds (enough for 30 dates + buffer)
+  timeout = 900  # 15 minutes maximum (unlimited until we get it working)
 
 # Get cached result function
 [functions."get-cached-result"]
