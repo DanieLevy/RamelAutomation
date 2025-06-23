@@ -53,7 +53,7 @@ export const handler: Handler = async (event, context) => {
       }
     }
     
-    // No cached result or cache expired
+    // No cached result or cache expired or file missing
     return {
       statusCode: 200,
       headers,
@@ -64,13 +64,16 @@ export const handler: Handler = async (event, context) => {
       })
     }
   } catch (error) {
+    // Defensive: never throw 500 for missing cache, only for true server errors
     console.error('Error getting cached result:', error)
     return {
-      statusCode: 500,
+      statusCode: 200,
       headers,
       body: JSON.stringify({
-        error: 'שגיאה בקבלת תוצאות',
-        message: error instanceof Error ? error.message : 'Unknown error'
+        cached: false,
+        message: 'אין תוצאות זמינות - שגיאה בגישה לקובץ המטמון',
+        suggestion: 'לחץ על "חפש תור קרוב" לבדיקה ידנית',
+        error: error instanceof Error ? error.message : 'Unknown error'
       })
     }
   }
