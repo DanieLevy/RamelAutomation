@@ -1,4 +1,4 @@
-import { Handler, HandlerEvent, HandlerContext } from '@netlify/functions'
+import type { Context } from '@netlify/functions'
 import axios from 'axios'
 import * as cheerio from 'cheerio'
 import { inflate } from 'pako'
@@ -49,16 +49,8 @@ const getOpenDays = (startDate: Date, maxDays: number): string[] => {
   return dates
 }
 
-// Cache storage (in production, you'd use a database or external storage)
-let lastCheckResult: {
-  timestamp: number
-  result: any
-} | null = null
-
-const CACHE_DURATION = 30 * 60 * 1000 // 30 minutes
-
 // Path to cache file: use /tmp in Netlify, local dir in dev
-const CACHE_FILE_PATH = process.env.NETLIFY ? '/tmp/cache.json' : path.join(__dirname, 'cache.json')
+const CACHE_FILE_PATH = process.env.NETLIFY ? '/tmp/cache.json' : path.join(process.cwd(), 'cache.json')
 
 // Helper to write cache to file
 function writeCacheToFile(data: any) {
@@ -86,13 +78,17 @@ async function checkSingleDate(dateStr: string): Promise<any> {
   const url = `https://mytor.co.il/home.php?i=cmFtZWwzMw%3D%3D&s=MjY1&mm=y&lang=he&datef=${dateStr}&signup=%D7%94%D7%A6%D7%92`
   
   try {
+    // Get environment variables using Netlify.env
+    const userId = Netlify.env.get('USER_ID') || '4481'
+    const codeAuth = Netlify.env.get('CODE_AUTH') || 'Sa1W2GjL'
+    
     const response = await axios.get(url, {
       headers: {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
         'Accept-Language': 'he-IL,he;q=0.9,en;q=0.8',
         'Accept-Encoding': 'gzip, deflate, br, zstd',
         'Cache-Control': 'no-cache',
-        'Cookie': 'userID=4481; codeAuth=Sa1W2GjL',
+        'Cookie': `userID=${userId}; codeAuth=${codeAuth}`,
         'Pragma': 'no-cache',
         'Sec-Ch-Ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
         'Sec-Ch-Ua-Mobile': '?0',
@@ -194,8 +190,8 @@ async function findClosestAppointment(): Promise<any> {
   }
 }
 
-// Background function handler
-export const handler: Handler = async (event: HandlerEvent, context: HandlerContext) => {
+// Modern Netlify Functions handler (NOT Lambda-style)
+export default async (req: Request, context: Context) => {
   console.log('Auto-check background function started')
   
   try {
@@ -203,13 +199,13 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
     const result = await findClosestAppointment()
     
     // Store result with timestamp
-    lastCheckResult = {
+    const cacheData = {
       timestamp: Date.now(),
       result: result
     }
     
     // Write to file cache
-    writeCacheToFile(lastCheckResult)
+    writeCacheToFile(cacheData)
     
     console.log('Auto-check completed successfully:', {
       found: result.summary.found,
@@ -217,67 +213,26 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
       timestamp: new Date().toISOString()
     })
     
-    // In a real implementation, you'd store this in a database
-    // For now, we'll just log it and store in memory
-    
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
-        success: true,
-        message: 'Auto-check completed',
-        result: result
-      })
-    }
+    return new Response(JSON.stringify({
+      success: true,
+      message: 'Auto-check completed',
+      result: result
+    }), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
   } catch (error) {
     console.error('Auto-check failed:', error)
-    return {
-      statusCode: 500,
-      body: JSON.stringify({
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      })
-    }
-  }
-}
-
-// Export function to get cached result (for the main API)
-export async function getCachedResult(): Promise<any> {
-  // Try to read from file cache first
-  const fileCache = readCacheFromFile()
-  if (fileCache) {
-    const now = Date.now()
-    const age = now - fileCache.timestamp
-    
-    if (age > CACHE_DURATION) {
-      return null // Cache expired
-    }
-    
-    return {
-      ...fileCache.result,
-      cached: true,
-      cacheAge: Math.floor(age / 1000 / 60), // Age in minutes
-      lastCheck: new Date(fileCache.timestamp).toLocaleString('he-IL', {
-        timeZone: ISRAEL_TIMEZONE
-      })
-    }
-  }
-  // Fallback to in-memory (shouldn't happen if file is used)
-  if (!lastCheckResult) {
-    return null
-  }
-  const now = Date.now()
-  const age = now - lastCheckResult.timestamp
-  
-  if (age > CACHE_DURATION) {
-    return null // Cache expired
-  }
-  
-  return {
-    ...lastCheckResult.result,
-    cached: true,
-    cacheAge: Math.floor(age / 1000 / 60), // Age in minutes
-    lastCheck: new Date(lastCheckResult.timestamp).toLocaleString('he-IL', {
-      timeZone: ISRAEL_TIMEZONE
+    return new Response(JSON.stringify({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }), {
+      status: 500,
+      headers: {
+        'Content-Type': 'application/json'
+      }
     })
   }
 } 
