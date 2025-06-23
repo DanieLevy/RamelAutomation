@@ -329,16 +329,21 @@ export default function Home() {
     const loadCachedResults = async () => {
       try {
         setLoadingCached(true)
+        console.log('Loading cached results from Netlify function...')
+        
         let response = await fetch('/.netlify/functions/get-cached-result')
+        console.log('Netlify function response status:', response.status)
         
         // If Netlify function fails, try Next.js API route as fallback
         if (!response.ok && response.status === 404) {
-          console.warn('Netlify function not available, trying Next.js API fallback')
+          console.warn('Netlify function not available (404), trying Next.js API fallback')
           response = await fetch('/api/get-cached-result')
+          console.log('Next.js API fallback response status:', response.status)
         }
         
         if (response.ok) {
           const data = await response.json()
+          console.log('Cached results loaded:', { cached: data.cached, found: data.summary?.found })
           
           // Check if we have cached auto-check results
           if (data.cached && data.summary?.found) {
@@ -347,7 +352,9 @@ export default function Home() {
             setCachedResult(null)
           }
         } else {
-          console.warn('Cache not available:', response.status)
+          console.warn('Cache not available - response status:', response.status)
+          const errorText = await response.text()
+          console.warn('Error response body:', errorText)
           setCachedResult(null)
         }
       } catch (error) {
