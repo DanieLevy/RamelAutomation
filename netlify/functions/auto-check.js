@@ -1,6 +1,7 @@
 const axios = require('axios')
 const cheerio = require('cheerio')
 const { createClient } = require('@supabase/supabase-js')
+const nodemailer = require('nodemailer')
 
 // Supabase client setup
 const supabase = createClient(
@@ -226,6 +227,43 @@ exports.handler = async (event, context) => {
       console.error('auto-check: Failed to write cache to Supabase:', error)
     } else {
       console.log('auto-check: Cache written to Supabase')
+    }
+    
+    // 1. Fetch notification requests from Supabase
+    const { data: notifications, error: notifError } = await supabase
+      .from('notifications')
+      .select('*')
+    if (notifError) {
+      console.error('Error fetching notifications:', notifError)
+    } else if (notifications && notifications.length > 0 && result.summary.found && result.summary.date) {
+      for (const notif of notifications) {
+        // Example: only notify if user wants the found date
+        if (notif.criteria && notif.criteria.date === result.summary.date) {
+          // 2. Send email
+          const unsubscribeUrl = `https://tor-ramel.netlify.app/api/unsubscribe?token=${notif.unsubscribe_token}`
+          const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+              user: process.env.EMAIL_SENDER,
+              pass: process.env.EMAIL_APP_PASSWORD,
+            },
+          })
+          const mailOptions = {
+            from: `"Barber Alert" <${process.env.EMAIL_SENDER}>`,
+            to: notif.email,
+            subject: 'תור פנוי במספרת רם-אל!',
+            text: `נמצא תור פנוי לתאריך ${result.summary.date}.\nלהסרה מההתראות: ${unsubscribeUrl}`,
+            html: `<p>נמצא תור פנוי לתאריך <b>${result.summary.date}</b>.</p><p><a href="${unsubscribeUrl}">להסרה מההתראות</a></p>`
+          }
+          try {
+            await transporter.sendMail(mailOptions)
+            // 3. Delete notification after sending (one-time)
+            await supabase.from('notifications').delete().eq('id', notif.id)
+          } catch (err) {
+            console.error('Error sending notification email:', err)
+          }
+        }
+      }
     }
     
     const totalTime = Math.round((Date.now() - startTime) / 1000)

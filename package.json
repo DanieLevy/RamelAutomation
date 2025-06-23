@@ -38,7 +38,9 @@
     "tailwind-merge": "^3.3.1",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5",
-    "workbox-webpack-plugin": "^7.3.0"
+    "workbox-webpack-plugin": "^7.3.0",
+    "nodemailer": "^6.9.8",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@netlify/plugin-nextjs": "^5.11.3",

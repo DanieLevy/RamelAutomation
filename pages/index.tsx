@@ -152,6 +152,8 @@ export default function Home() {
   const [showPWABanner, setShowPWABanner] = useState(false)
   const [isStandalone, setIsStandalone] = useState(false)
   const [isIOSDevice, setIsIOSDevice] = useState(false)
+  const [notifyStatus, setNotifyStatus] = useState<string | null>(null)
+  const [notifyLoading, setNotifyLoading] = useState(false)
 
   useEffect(() => {
     // Check online status
@@ -777,6 +779,67 @@ ${availableResults.length} תאריכים זמינים
               </div>
             </div>
           )}
+
+          {/* Notification Form */}
+          <div className="mt-6">
+            <form
+              className="flex flex-col gap-2 items-center max-w-xs mx-auto"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setNotifyStatus(null);
+                const form = e.target as HTMLFormElement;
+                const email = (form.email as HTMLInputElement).value;
+                const date = (form.date as HTMLInputElement).value;
+                if (!email || !date) {
+                  setNotifyStatus('נא למלא אימייל ותאריך');
+                  return;
+                }
+                setNotifyLoading(true);
+                try {
+                  const res = await fetch('/api/notify-request', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, date }),
+                  });
+                  const data = await res.json();
+                  if (data.success) {
+                    setNotifyStatus('נרשמת בהצלחה! תקבל התראה אם יימצא תור.');
+                  } else {
+                    setNotifyStatus(data.error || 'שגיאה בהרשמה');
+                  }
+                } catch (err) {
+                  setNotifyStatus('שגיאה בהרשמה');
+                } finally {
+                  setNotifyLoading(false);
+                }
+              }}
+            >
+              <input
+                type="email"
+                name="email"
+                placeholder="האימייל שלך"
+                className="w-full rounded border px-3 py-2 text-sm"
+                required
+                autoComplete="email"
+              />
+              <input
+                type="date"
+                name="date"
+                className="w-full rounded border px-3 py-2 text-sm"
+                required
+              />
+              <button
+                type="submit"
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded py-2 text-sm font-medium mt-1 disabled:opacity-60"
+                disabled={notifyLoading}
+              >
+                {notifyLoading ? 'נרשם...' : 'התראה על תור בתאריך זה'}
+              </button>
+              {notifyStatus && (
+                <div className="text-xs text-center mt-1 text-gray-500">{notifyStatus}</div>
+              )}
+            </form>
+          </div>
         </div>
       </div>
     </>
