@@ -154,6 +154,7 @@ export default function Home() {
   const [isIOSDevice, setIsIOSDevice] = useState(false)
   const [notifyStatus, setNotifyStatus] = useState<string | null>(null)
   const [notifyLoading, setNotifyLoading] = useState(false)
+  const [notifyType, setNotifyType] = useState<'single' | 'range'>('single')
 
   useEffect(() => {
     // Check online status

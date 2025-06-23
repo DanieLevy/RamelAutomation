@@ -237,8 +237,15 @@ exports.handler = async (event, context) => {
       console.error('Error fetching notifications:', notifError)
     } else if (notifications && notifications.length > 0 && result.summary.found && result.summary.date) {
       for (const notif of notifications) {
-        // Example: only notify if user wants the found date
-        if (notif.criteria && notif.criteria.date === result.summary.date) {
+        let match = false;
+        if (notif.criteria_type === 'single' && notif.criteria && notif.criteria.date === result.summary.date) {
+          match = true;
+        } else if (notif.criteria_type === 'range' && notif.criteria && notif.criteria.start && notif.criteria.end) {
+          if (result.summary.date >= notif.criteria.start && result.summary.date <= notif.criteria.end) {
+            match = true;
+          }
+        }
+        if (match) {
           // 2. Send email
           const unsubscribeUrl = `https://tor-ramel.netlify.app/api/unsubscribe?token=${notif.unsubscribe_token}`
           const transporter = nodemailer.createTransport({

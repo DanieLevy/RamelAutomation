@@ -11,19 +11,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
-  const { email, date } = req.body;
-  if (!email || !date) {
-    return res.status(400).json({ error: 'Missing email or date' });
+  const { email, date, start, end } = req.body;
+  if (!email || (!date && (!start || !end))) {
+    return res.status(400).json({ error: 'Missing required fields' });
   }
-  // Basic email validation
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     return res.status(400).json({ error: 'Invalid email' });
+  }
+  let criteria, criteria_type;
+  if (date) {
+    criteria = { date };
+    criteria_type = 'single';
+  } else {
+    criteria = { start, end };
+    criteria_type = 'range';
   }
   const unsubscribe_token = uuidv4();
   const { error } = await supabase.from('notifications').insert([
     {
       email,
-      criteria: { date },
+      criteria,
+      criteria_type,
       unsubscribe_token,
     },
   ]);
