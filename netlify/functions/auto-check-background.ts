@@ -2,6 +2,8 @@ import { Handler, HandlerEvent, HandlerContext } from '@netlify/functions'
 import axios from 'axios'
 import * as cheerio from 'cheerio'
 import { inflate } from 'pako'
+import * as fs from 'fs'
+import * as path from 'path'
 
 // Israel timezone utilities
 const ISRAEL_TIMEZONE = 'Asia/Jerusalem'
@@ -54,6 +56,31 @@ let lastCheckResult: {
 } | null = null
 
 const CACHE_DURATION = 30 * 60 * 1000 // 30 minutes
+
+// Path to cache file
+const CACHE_FILE_PATH = path.join(__dirname, 'cache.json')
+
+// Helper to write cache to file
+function writeCacheToFile(data: any) {
+  try {
+    fs.writeFileSync(CACHE_FILE_PATH, JSON.stringify(data, null, 2), 'utf-8')
+  } catch (err) {
+    console.error('Failed to write cache file:', err)
+  }
+}
+
+// Helper to read cache from file
+function readCacheFromFile() {
+  try {
+    if (fs.existsSync(CACHE_FILE_PATH)) {
+      const raw = fs.readFileSync(CACHE_FILE_PATH, 'utf-8')
+      return JSON.parse(raw)
+    }
+  } catch (err) {
+    console.error('Failed to read cache file:', err)
+  }
+  return null
+}
 
 async function checkSingleDate(dateStr: string): Promise<any> {
   const url = `https://mytor.co.il/home.php?i=cmFtZWwzMw%3D%3D&s=MjY1&mm=y&lang=he&datef=${dateStr}&signup=%D7%94%D7%A6%D7%92`
@@ -181,6 +208,9 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
       result: result
     }
     
+    // Write to file cache
+    writeCacheToFile(lastCheckResult)
+    
     console.log('Auto-check completed successfully:', {
       found: result.summary.found,
       date: result.summary.date,
@@ -212,10 +242,29 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
 
 // Export function to get cached result (for the main API)
 export async function getCachedResult(): Promise<any> {
+  // Try to read from file cache first
+  const fileCache = readCacheFromFile()
+  if (fileCache) {
+    const now = Date.now()
+    const age = now - fileCache.timestamp
+    
+    if (age > CACHE_DURATION) {
+      return null // Cache expired
+    }
+    
+    return {
+      ...fileCache.result,
+      cached: true,
+      cacheAge: Math.floor(age / 1000 / 60), // Age in minutes
+      lastCheck: new Date(fileCache.timestamp).toLocaleString('he-IL', {
+        timeZone: ISRAEL_TIMEZONE
+      })
+    }
+  }
+  // Fallback to in-memory (shouldn't happen if file is used)
   if (!lastCheckResult) {
     return null
   }
-  
   const now = Date.now()
   const age = now - lastCheckResult.timestamp
   

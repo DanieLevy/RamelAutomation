@@ -1,10 +1,20 @@
 import { Handler } from '@netlify/functions'
+import * as fs from 'fs';
+import * as path from 'path';
 
-// Simple in-memory cache (in production, use a database)
-let cachedResult: {
-  timestamp: number
-  result: any
-} | null = null
+const CACHE_FILE_PATH = path.join(__dirname, 'cache.json');
+
+function readCacheFromFile() {
+  try {
+    if (fs.existsSync(CACHE_FILE_PATH)) {
+      const raw = fs.readFileSync(CACHE_FILE_PATH, 'utf-8');
+      return JSON.parse(raw);
+    }
+  } catch (err) {
+    console.error('Failed to read cache file:', err);
+  }
+  return null;
+}
 
 const CACHE_DURATION = 30 * 60 * 1000 // 30 minutes
 
@@ -22,28 +32,24 @@ export const handler: Handler = async (event, context) => {
   }
   
   try {
-    // Check if we have a cached result
-    if (cachedResult) {
-      const now = Date.now()
-      const age = now - cachedResult.timestamp
-      
+    // Try to read from file cache first
+    const fileCache = readCacheFromFile();
+    if (fileCache) {
+      const now = Date.now();
+      const age = now - fileCache.timestamp;
       if (age <= CACHE_DURATION) {
-        // Return cached result with metadata
         return {
           statusCode: 200,
           headers,
           body: JSON.stringify({
-            ...cachedResult.result,
+            ...fileCache.result,
             cached: true,
             cacheAge: Math.floor(age / 1000 / 60), // Age in minutes
-            lastCheck: new Date(cachedResult.timestamp).toLocaleString('he-IL', {
+            lastCheck: new Date(fileCache.timestamp).toLocaleString('he-IL', {
               timeZone: 'Asia/Jerusalem'
             })
           })
         }
-      } else {
-        // Cache expired, clear it
-        cachedResult = null
       }
     }
     
@@ -67,13 +73,5 @@ export const handler: Handler = async (event, context) => {
         message: error instanceof Error ? error.message : 'Unknown error'
       })
     }
-  }
-}
-
-// Function to update cache (called by background function)
-export function updateCache(result: any) {
-  cachedResult = {
-    timestamp: Date.now(),
-    result: result
   }
 } 

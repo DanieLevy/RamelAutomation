@@ -10,14 +10,15 @@
   package = "@netlify/plugin-nextjs"
 
 # Scheduled function to run auto-check every 30 minutes
-[[functions]]
-  path = "netlify/functions/scheduled-check.ts"
-  schedule = "0 */5 * * * *"  # Every 30 minutes
+[functions]
+  # (Optional) global config here
+
+[functions."scheduled-check"]
+  schedule = "*/5 * * * *" # every 5 minutes
 
 # Background function configuration
-[[functions]]
-  path = "netlify/functions/auto-check-background.ts"
-  timeout = 900  # 15 minutes maximum
+[functions."auto-check-background"]
+  timeout = 900
 
 # Environment variables needed for deployment
 # Set these in Netlify dashboard:
