@@ -102,7 +102,34 @@ const generateBookingUrl = (dateStr: string): string => {
 // Utility to detect iOS
 function isIOS() {
   if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
-  return /iphone|ipad|ipod/i.test(navigator.userAgent);
+  return /iphone|ipad|ipod/i.test(navigator.userAgent) || 
+         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPad on iOS 13+
+}
+
+function isIOSStandalone() {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+  return (window.navigator as any).standalone === true;
+}
+
+function isInStandaloneMode() {
+  if (typeof window === 'undefined') return false;
+  
+  // Check for iOS standalone mode
+  if (isIOS() && isIOSStandalone()) {
+    return true;
+  }
+  
+  // Check for display-mode: standalone (Android, desktop PWA)
+  if (window.matchMedia('(display-mode: standalone)').matches) {
+    return true;
+  }
+  
+  // Check for Android app referrer
+  if (document.referrer.includes('android-app://')) {
+    return true;
+  }
+  
+  return false;
 }
 
 export default function Home() {
@@ -131,11 +158,9 @@ export default function Home() {
 
     // Check if app is already installed (running in standalone mode)
     const checkStandalone = () => {
-      const isStandaloneMode = window.matchMedia('(display-mode: standalone)').matches ||
-                               (window.navigator as any).standalone ||
-                               document.referrer.includes('android-app://');
-      setIsStandalone(isStandaloneMode)
-      return isStandaloneMode
+      const standaloneMode = isInStandaloneMode()
+      setIsStandalone(standaloneMode)
+      return standaloneMode
     }
 
     // Check PWA installability
@@ -155,24 +180,35 @@ export default function Home() {
         }
       }
 
-      // Check if service worker is supported
+      const isIOSDevice = isIOS()
+      const isSecure = location.protocol === 'https:' || location.hostname === 'localhost'
+      
+      // For iOS devices, always show banner if not dismissed and not standalone
+      if (isIOSDevice && isSecure) {
+        setTimeout(() => {
+          const stillDismissed = localStorage.getItem('pwa-banner-dismissed')
+          if (!stillDismissed && !isInStandaloneMode()) {
+            setShowPWABanner(true)
+            setIsIOSDevice(true)
+          }
+        }, 2000) // Show after 2 seconds
+        return
+      }
+
+      // For non-iOS devices, check service worker support
       if (!('serviceWorker' in navigator)) {
         return
       }
 
-      // Check if we're on HTTPS or localhost
-      const isSecure = location.protocol === 'https:' || location.hostname === 'localhost'
-
       // For development/testing, show banner after a delay if no beforeinstallprompt
       if (process.env.NODE_ENV === 'development' || !isSecure) {
         setTimeout(() => {
-          // Double-check dismissal state before showing
           const stillDismissed = localStorage.getItem('pwa-banner-dismissed')
           if (stillDismissed) {
             return
           }
           
-          if (!installPrompt && !isStandalone) {
+          if (!installPrompt && !isInStandaloneMode()) {
             setCanInstall(true)
             setShowPWABanner(true)
           }
@@ -182,10 +218,16 @@ export default function Home() {
 
     // Handle PWA install prompt
     const handleBeforeInstallPrompt = (e: any) => {
-      e.preventDefault()
-      setInstallPrompt(e)
-      setCanInstall(true)
-      setShowPWABanner(true)
+      // Only prevent default if we're not in standalone mode and banner wasn't recently dismissed
+      const dismissed = localStorage.getItem('pwa-banner-dismissed')
+      const recentlyDismissed = dismissed && (Date.now() - parseInt(dismissed) < 24 * 60 * 60 * 1000)
+      
+      if (!isInStandaloneMode() && !recentlyDismissed) {
+        e.preventDefault()
+        setInstallPrompt(e)
+        setCanInstall(true)
+        setShowPWABanner(true)
+      }
     }
 
     const handleAppInstalled = () => {
@@ -205,8 +247,9 @@ export default function Home() {
     // Listen for display mode changes
     const mediaQuery = window.matchMedia('(display-mode: standalone)')
     const handleDisplayModeChange = (e: MediaQueryListEvent) => {
-      setIsStandalone(e.matches)
-      if (e.matches) {
+      const standaloneMode = isInStandaloneMode()
+      setIsStandalone(standaloneMode)
+      if (standaloneMode) {
         setShowPWABanner(false)
       }
     }
@@ -225,28 +268,33 @@ export default function Home() {
 
   const handleInstall = async () => {
     if (!installPrompt) {
-      // For testing purposes, simulate installation
-      if (process.env.NODE_ENV === 'development') {
-        setCanInstall(false)
-        setShowPWABanner(false)
-        alert('PWA installation would happen here (development mode)')
-        return
-      }
+      // For iOS or when no install prompt is available
+      setShowPWABanner(false)
+      setCanInstall(false)
       return
     }
 
     try {
-      installPrompt.prompt()
+      // Show the install prompt
+      const result = await installPrompt.prompt()
+      
+      // Wait for the user to respond to the prompt
       const { outcome } = await installPrompt.userChoice
       
       if (outcome === 'accepted') {
         setCanInstall(false)
         setShowPWABanner(false)
+      } else {
+        // User dismissed the prompt
+        setShowPWABanner(false)
       }
       
+      // Clear the stored prompt
       setInstallPrompt(null)
     } catch (error) {
       console.error('Error during PWA installation:', error)
+      setShowPWABanner(false)
+      setCanInstall(false)
     }
   }
 
@@ -280,7 +328,15 @@ export default function Home() {
   useEffect(() => {
     const loadCachedResults = async () => {
       try {
-        const response = await fetch('/.netlify/functions/get-cached-result')
+        setLoadingCached(true)
+        let response = await fetch('/.netlify/functions/get-cached-result')
+        
+        // If Netlify function fails, try Next.js API route as fallback
+        if (!response.ok && response.status === 404) {
+          console.warn('Netlify function not available, trying Next.js API fallback')
+          response = await fetch('/api/get-cached-result')
+        }
+        
         if (response.ok) {
           const data = await response.json()
           
@@ -290,9 +346,15 @@ export default function Home() {
           } else if (data.cached) {
             setCachedResult(null)
           }
+        } else {
+          console.warn('Cache not available:', response.status)
+          setCachedResult(null)
         }
       } catch (error) {
         console.error('Failed to load cached results:', error)
+        setCachedResult(null)
+      } finally {
+        setLoadingCached(false)
       }
     }
 
@@ -385,9 +447,7 @@ ${availableResults.length} תאריכים זמינים
 
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 font-hebrew">
         {/* Status Bar */}
-        <div className={`sticky z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 transition-all duration-300 ${
-          showPWABanner ? 'top-16' : 'top-0'
-        }`}>
+        <div className="sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700">
           <div className="max-w-md mx-auto px-4 py-2 flex justify-between items-center text-sm">
             <div className="flex items-center gap-2">
               {isOnline ? (
@@ -415,7 +475,7 @@ ${availableResults.length} תאריכים זמינים
           </div>
         </div>
 
-        <div className="max-w-md mx-auto p-4 space-y-6">
+        <div className={`max-w-md mx-auto p-4 space-y-6 ${showPWABanner ? 'pb-24' : 'pb-4'}`}>
           {/* Header */}
           <div className="text-center space-y-3 pt-4">
             <div className="flex flex-col items-center justify-center gap-2">
@@ -443,79 +503,58 @@ ${availableResults.length} תאריכים זמינים
           {!loadingCached && (
             <>
               {cachedResult && cachedResult.summary?.found ? (
-                <Card className="font-hebrew border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg font-normal flex items-center gap-2 text-green-800 dark:text-green-200">
-                      <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                      🎉 תור קרוב נמצא אוטומטית!
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="text-center">
-                      <div className="text-2xl font-light text-green-900 dark:text-green-100">
+                <div className="font-hebrew relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 dark:from-emerald-950/50 dark:via-green-950/50 dark:to-teal-950/50 border border-emerald-200/50 dark:border-emerald-800/50 shadow-lg">
+                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-teal-500/5"></div>
+                  <div className="relative p-6 space-y-5">
+                    <div className="text-center space-y-2">
+                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-sm font-medium">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                        תור זמין נמצא
+                      </div>
+                      <div className="text-3xl font-light text-emerald-900 dark:text-emerald-100 tracking-wide">
                         {formatDisplayDateIsrael(cachedResult.summary.date)}
                       </div>
-                      <div className="text-sm text-green-700 dark:text-green-300">
+                      <div className="text-emerald-700 dark:text-emerald-300 font-medium">
                         {getDayNameHebrew(cachedResult.summary.date)}
                       </div>
                     </div>
                     
                     <div className="flex flex-wrap gap-2 justify-center">
                       {cachedResult.summary.times?.map((time: string, index: number) => (
-                        <Badge key={index} variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
+                        <div key={index} className="px-3 py-1 rounded-lg bg-white/70 dark:bg-black/20 backdrop-blur-sm border border-emerald-200/50 dark:border-emerald-700/50 text-emerald-800 dark:text-emerald-200 font-medium text-sm">
                           {formatTimeIsrael(time)}
-                        </Badge>
+                        </div>
                       ))}
                     </div>
                     
-                    <div className="flex gap-2">
+                    <div className="flex gap-3">
                       <Button
                         onClick={() => window.open(generateBookingUrl(cachedResult.summary.date), '_blank')}
-                        className="flex-1 bg-green-600 hover:bg-green-700 text-white font-light"
+                        className="flex-1 h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
                       >
                         🎯 קבע תור עכשיו
                       </Button>
                       <Button
                         variant="outline"
                         onClick={handleShare}
-                        className="border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-300"
+                        className="h-12 px-4 border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-600 dark:text-emerald-300 dark:hover:bg-emerald-950/30 rounded-xl"
                       >
-                        <Share2 className="h-4 w-4" />
+                        <Share2 className="h-5 w-5" />
                       </Button>
                     </div>
                     
-                    <div className="text-xs text-green-600 dark:text-green-400 text-center">
-                      📅 בדיקה אוטומטית מ-{cachedResult.lastCheck} ({cachedResult.cacheAge} דקות)
+                    <div className="text-xs text-emerald-600/80 dark:text-emerald-400/80 text-center">
+                      עודכן לפני {cachedResult.cacheAge} דקות
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               ) : (
-                <Card className="font-hebrew border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg font-normal flex items-center gap-2 text-blue-800 dark:text-blue-200">
-                      <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
-                      🔍 בדיקה אוטומטית פעילה
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="text-center">
-                      <div className="text-lg font-light text-blue-900 dark:text-blue-100">
-                        לא נמצאו תורים פנויים כרגע
-                      </div>
-                      <div className="text-sm text-blue-700 dark:text-blue-300">
-                        המערכת בודקת כל 5 דקות אוטומטית
-                      </div>
-                    </div>
-                    
-                    {cachedResult && (
-                      <div className="text-xs text-blue-600 dark:text-blue-400 text-center">
-                        📅 בדיקה אחרונה: {cachedResult.lastCheck} ({cachedResult.cacheAge} דקות)
-                        <br />
-                        🔢 נבדקו {cachedResult.summary?.totalChecked || 30} ימים
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                <div className="font-hebrew text-center py-2">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 text-xs">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
+                    בדיקה אוטומטית כל 5 דקות
+                  </div>
+                </div>
               )}
             </>
           )}
