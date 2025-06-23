@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Calendar, Clock, Search, Smartphone, Wifi, WifiOff, Share2, Copy, Download, MapPin, ExternalLink } from 'lucide-react';
 import PWABanner from '../components/PWABanner';
+import { createClient } from '@supabase/supabase-js';
 
 interface AppointmentResult {
   date: string;
@@ -131,6 +132,12 @@ function isInStandaloneMode() {
   
   return false;
 }
+
+// Supabase client setup
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY!
+);
 
 export default function Home() {
   const [results, setResults] = useState<AppointmentResult[]>([])
@@ -328,49 +335,33 @@ export default function Home() {
   useEffect(() => {
     const loadCachedResults = async () => {
       try {
-        setLoadingCached(true)
-        console.log('Loading cached results from Netlify function...')
-        
-        let response = await fetch('/.netlify/functions/get-cached-result')
-        console.log('Netlify function response status:', response.status)
-        
-        // If Netlify function fails, try Next.js API route as fallback
-        if (!response.ok && response.status === 404) {
-          console.warn('Netlify function not available (404), trying Next.js API fallback')
-          response = await fetch('/api/get-cached-result')
-          console.log('Next.js API fallback response status:', response.status)
-        }
-        
-        if (response.ok) {
-          const data = await response.json()
-          console.log('Cached results loaded:', { cached: data.cached, found: data.summary?.found })
-          
-          // Check if we have cached auto-check results
-          if (data.cached && data.summary?.found) {
-            setCachedResult(data)
-          } else if (data.cached) {
-            setCachedResult(null)
-          }
+        setLoadingCached(true);
+        console.log('Loading cached results from Supabase...');
+        const { data, error } = await supabase
+          .from('cache')
+          .select('value')
+          .eq('key', 'auto-check')
+          .single();
+        if (error) {
+          console.error('Supabase error loading cache:', error);
+          setCachedResult(null);
+        } else if (data && data.value && data.value.result && data.value.result.summary) {
+          setCachedResult(data.value);
         } else {
-          console.warn('Cache not available - response status:', response.status)
-          const errorText = await response.text()
-          console.warn('Error response body:', errorText)
-          setCachedResult(null)
+          setCachedResult(null);
         }
       } catch (error) {
-        console.error('Failed to load cached results:', error)
-        setCachedResult(null)
+        console.error('Failed to load cached results from Supabase:', error);
+        setCachedResult(null);
       } finally {
-        setLoadingCached(false)
+        setLoadingCached(false);
       }
-    }
-
-    loadCachedResults()
-
-    // Set up interval to refresh cached results every 2 minutes
-    const interval = setInterval(loadCachedResults, 2 * 60 * 1000)
-    return () => clearInterval(interval)
-  }, [])
+    };
+    loadCachedResults();
+    // Refresh cached results every 5 minutes
+    const interval = setInterval(loadCachedResults, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const checkAppointments = async () => {
     setLoading(true)
@@ -430,6 +421,32 @@ ${availableResults.length} תאריכים זמינים
       await navigator.clipboard.writeText(text)
       // Could add a toast notification here
     }
+  }
+
+  // When rendering, always use cachedResult.result.summary (robust to structure)
+  const cachedSummary = cachedResult?.result?.summary;
+  const cachedFound = cachedSummary?.found;
+  const cachedDate = cachedSummary?.date;
+  const cachedTimes = cachedSummary?.times;
+  const lastCheckTimestamp = cachedResult?.timestamp;
+
+  // Calculate how many minutes ago the last check was
+  let lastCheckMinutesAgo: number | null = null;
+  let lastCheckDisplay: string | null = null;
+  if (lastCheckTimestamp) {
+    const now = Date.now();
+    lastCheckMinutesAgo = Math.floor((now - lastCheckTimestamp) / 60000);
+    // Format the exact time in Israel timezone
+    const lastCheckDate = new Date(lastCheckTimestamp);
+    lastCheckDisplay = new Intl.DateTimeFormat('he-IL', {
+      timeZone: 'Asia/Jerusalem',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(lastCheckDate);
   }
 
   return (
@@ -509,51 +526,38 @@ ${availableResults.length} תאריכים זמינים
           {/* Auto-Check Results */}
           {!loadingCached && (
             <>
-              {cachedResult && cachedResult.summary?.found ? (
-                <div className="font-hebrew relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 dark:from-emerald-950/50 dark:via-green-950/50 dark:to-teal-950/50 border border-emerald-200/50 dark:border-emerald-800/50 shadow-lg">
-                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-teal-500/5"></div>
-                  <div className="relative p-6 space-y-5">
-                    <div className="text-center space-y-2">
-                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-sm font-medium">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                        תור זמין נמצא
-                      </div>
-                      <div className="text-3xl font-light text-emerald-900 dark:text-emerald-100 tracking-wide">
-                        {formatDisplayDateIsrael(cachedResult.summary.date)}
-                      </div>
-                      <div className="text-emerald-700 dark:text-emerald-300 font-medium">
-                        {getDayNameHebrew(cachedResult.summary.date)}
-                      </div>
-                    </div>
-                    
-                    <div className="flex flex-wrap gap-2 justify-center">
-                      {cachedResult.summary.times?.map((time: string, index: number) => (
-                        <div key={index} className="px-3 py-1 rounded-lg bg-white/70 dark:bg-black/20 backdrop-blur-sm border border-emerald-200/50 dark:border-emerald-700/50 text-emerald-800 dark:text-emerald-200 font-medium text-sm">
-                          {formatTimeIsrael(time)}
-                        </div>
-                      ))}
-                    </div>
-                    
-                    <div className="flex gap-3">
-                      <Button
-                        onClick={() => window.open(generateBookingUrl(cachedResult.summary.date), '_blank')}
-                        className="flex-1 h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
-                      >
-                        🎯 קבע תור עכשיו
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={handleShare}
-                        className="h-12 px-4 border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-600 dark:text-emerald-300 dark:hover:bg-emerald-950/30 rounded-xl"
-                      >
-                        <Share2 className="h-5 w-5" />
-                      </Button>
-                    </div>
-                    
-                    <div className="text-xs text-emerald-600/80 dark:text-emerald-400/80 text-center">
-                      עודכן לפני {cachedResult.cacheAge} דקות
-                    </div>
+              {cachedSummary && cachedFound ? (
+                <div className="font-hebrew rounded-xl bg-white/80 dark:bg-gray-900/80 shadow-sm border border-emerald-100 dark:border-emerald-900 px-4 py-5 flex flex-col items-center text-center space-y-3">
+                  <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-300 text-xs font-medium mb-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    התור הכי קרוב
+                    <span className="text-gray-400 dark:text-gray-500 text-[11px] font-normal ml-1">— נמצא אוטומטית</span>
+                  </span>
+                  <div className="text-2xl font-bold text-emerald-900 dark:text-emerald-100 leading-tight">
+                    {formatDisplayDateIsrael(cachedDate)}
                   </div>
+                  <div className="text-emerald-700 dark:text-emerald-300 text-sm font-medium mb-1">
+                    {getDayNameHebrew(cachedDate)}
+                  </div>
+                  <div className="flex flex-wrap gap-1 justify-center">
+                    {cachedTimes?.map((time: string, index: number) => (
+                      <span key={index} className="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-200 text-xs font-semibold">
+                        {formatTimeIsrael(time)}
+                      </span>
+                    ))}
+                  </div>
+                  <Button
+                    onClick={() => window.open(generateBookingUrl(cachedDate), '_blank')}
+                    className="w-full h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg mt-2 shadow-sm"
+                  >
+                    קבע תור עכשיו
+                  </Button>
+                  {lastCheckMinutesAgo !== null && (
+                    <div className="text-[11px] text-gray-400 mt-2 flex items-center justify-center gap-1">
+                      <span aria-label="עודכן לאחרונה" title={lastCheckDisplay || ''}>⏱️</span>
+                      <span>עודכן לפני {lastCheckMinutesAgo} דקות</span>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="font-hebrew text-center py-2">

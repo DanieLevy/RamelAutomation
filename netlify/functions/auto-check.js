@@ -1,7 +1,12 @@
 const axios = require('axios')
 const cheerio = require('cheerio')
-const fs = require('fs')
-const path = require('path')
+const { createClient } = require('@supabase/supabase-js')
+
+// Supabase client setup
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+)
 
 // Israel timezone utilities
 const ISRAEL_TIMEZONE = 'Asia/Jerusalem'
@@ -53,38 +58,6 @@ const getOpenDays = (startDate, totalDays) => {
   }
   
   return openDays
-}
-
-// Path to cache file: use /tmp in Netlify, local dir in dev
-// Check multiple environment indicators for Netlify
-const isNetlify = process.env.NETLIFY || process.env.NETLIFY_BUILD_BASE || process.env.AWS_LAMBDA_FUNCTION_NAME
-const CACHE_FILE_PATH = isNetlify ? '/tmp/cache.json' : path.join(process.cwd(), 'cache.json')
-
-// Helper to write cache to file
-function writeCacheToFile(data) {
-  try {
-    console.log(`auto-check: Attempting to write cache to: ${CACHE_FILE_PATH}`)
-    fs.writeFileSync(CACHE_FILE_PATH, JSON.stringify(data, null, 2), 'utf-8')
-    console.log('auto-check: Cache successfully written to file')
-  } catch (err) {
-    console.error('auto-check: Failed to write cache file:', err)
-    console.error('auto-check: Cache file path was:', CACHE_FILE_PATH)
-    console.error('auto-check: Environment check - NETLIFY:', process.env.NETLIFY)
-    console.error('auto-check: Environment check - AWS_LAMBDA:', process.env.AWS_LAMBDA_FUNCTION_NAME)
-  }
-}
-
-// Helper to read cache from file
-function readCacheFromFile() {
-  try {
-    if (fs.existsSync(CACHE_FILE_PATH)) {
-      const raw = fs.readFileSync(CACHE_FILE_PATH, 'utf-8')
-      return JSON.parse(raw)
-    }
-  } catch (err) {
-    console.error('Failed to read cache file:', err)
-  }
-  return null
 }
 
 // OPTIMIZED: Ultra-fast single date check with reduced timeout
@@ -241,14 +214,19 @@ exports.handler = async (event, context) => {
     
     const result = await findClosestAppointmentOptimized()
     
-    // Store result with timestamp
+    // Store result with timestamp in Supabase
     const cacheData = {
       timestamp: Date.now(),
       result: result
     }
-    
-    // Write to file cache
-    writeCacheToFile(cacheData)
+    const { error } = await supabase
+      .from('cache')
+      .upsert([{ key: 'auto-check', value: cacheData }])
+    if (error) {
+      console.error('auto-check: Failed to write cache to Supabase:', error)
+    } else {
+      console.log('auto-check: Cache written to Supabase')
+    }
     
     const totalTime = Math.round((Date.now() - startTime) / 1000)
     console.log(`auto-check: ✅ Function completed in ${totalTime}s`)
