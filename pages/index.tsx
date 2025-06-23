@@ -103,11 +103,12 @@ export default function Home() {
   const [results, setResults] = useState<AppointmentResult[]>([])
   const [loading, setLoading] = useState(false)
   const [days, setDays] = useState(7)
-  const [searchMode, setSearchMode] = useState<'range' | 'closest'>('range')
+  const [searchMode, setSearchMode] = useState<'range' | 'closest'>('closest')
   const [isOnline, setIsOnline] = useState(true)
   const [canInstall, setCanInstall] = useState(false)
   const [installPrompt, setInstallPrompt] = useState<any>(null)
   const [showPWABanner, setShowPWABanner] = useState(false)
+  const [isStandalone, setIsStandalone] = useState(false)
 
   useEffect(() => {
     // Check online status
@@ -119,8 +120,68 @@ export default function Home() {
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
 
+    // Check if app is already installed (running in standalone mode)
+    const checkStandalone = () => {
+      const isStandaloneMode = window.matchMedia('(display-mode: standalone)').matches ||
+                               (window.navigator as any).standalone ||
+                               document.referrer.includes('android-app://');
+      setIsStandalone(isStandaloneMode)
+      console.log('PWA Debug: Standalone mode:', isStandaloneMode)
+      return isStandaloneMode
+    }
+
+    // Check PWA installability
+    const checkPWAInstallability = () => {
+      // Don't show banner if already installed
+      if (checkStandalone()) {
+        console.log('PWA Debug: App already installed, hiding banner')
+        return
+      }
+
+      // Check if banner was recently dismissed
+      const dismissed = localStorage.getItem('pwa-banner-dismissed')
+      if (dismissed) {
+        const dismissedTime = parseInt(dismissed)
+        const oneDay = 24 * 60 * 60 * 1000 // 24 hours
+        if (Date.now() - dismissedTime < oneDay) {
+          console.log('PWA Debug: Banner recently dismissed, not checking installability')
+          return
+        }
+      }
+
+      // Check if service worker is supported
+      if (!('serviceWorker' in navigator)) {
+        console.log('PWA Debug: Service Worker not supported')
+        return
+      }
+
+      // Check if we're on HTTPS or localhost
+      const isSecure = location.protocol === 'https:' || location.hostname === 'localhost'
+      console.log('PWA Debug: Secure context:', isSecure)
+
+      // For development/testing, show banner after a delay if no beforeinstallprompt
+      if (process.env.NODE_ENV === 'development' || !isSecure) {
+        console.log('PWA Debug: Development mode or insecure context - checking for test banner')
+        setTimeout(() => {
+          // Double-check dismissal state before showing
+          const stillDismissed = localStorage.getItem('pwa-banner-dismissed')
+          if (stillDismissed) {
+            console.log('PWA Debug: Banner still dismissed, not showing test banner')
+            return
+          }
+          
+          if (!installPrompt && !isStandalone) {
+            setCanInstall(true)
+            setShowPWABanner(true)
+            console.log('PWA Debug: Showing test banner (no beforeinstallprompt received)')
+          }
+        }, 3000) // Show after 3 seconds if no event received
+      }
+    }
+
     // Handle PWA install prompt
     const handleBeforeInstallPrompt = (e: any) => {
+      console.log('PWA Debug: beforeinstallprompt event received')
       e.preventDefault()
       setInstallPrompt(e)
       setCanInstall(true)
@@ -128,39 +189,103 @@ export default function Home() {
     }
 
     const handleAppInstalled = () => {
+      console.log('PWA Debug: App installed successfully')
       setCanInstall(false)
       setInstallPrompt(null)
       setShowPWABanner(false)
+      setIsStandalone(true)
     }
 
+    // Add event listeners
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
     window.addEventListener('appinstalled', handleAppInstalled)
+
+    // Initial checks
+    checkPWAInstallability()
+
+    // Listen for display mode changes
+    const mediaQuery = window.matchMedia('(display-mode: standalone)')
+    const handleDisplayModeChange = (e: MediaQueryListEvent) => {
+      console.log('PWA Debug: Display mode changed:', e.matches)
+      setIsStandalone(e.matches)
+      if (e.matches) {
+        setShowPWABanner(false)
+      }
+    }
+    mediaQuery.addListener(handleDisplayModeChange)
 
     return () => {
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
       window.removeEventListener('appinstalled', handleAppInstalled)
+      mediaQuery.removeListener(handleDisplayModeChange)
     }
   }, [])
 
   const handleInstall = async () => {
-    if (!installPrompt) return
-
-    installPrompt.prompt()
-    const { outcome } = await installPrompt.userChoice
+    console.log('PWA Debug: Install button clicked')
     
-    if (outcome === 'accepted') {
-      setCanInstall(false)
-      setShowPWABanner(false)
+    if (!installPrompt) {
+      console.log('PWA Debug: No install prompt available - this might be a test banner')
+      // For testing purposes, simulate installation
+      if (process.env.NODE_ENV === 'development') {
+        setCanInstall(false)
+        setShowPWABanner(false)
+        alert('PWA installation would happen here (development mode)')
+        return
+      }
+      return
     }
-    
-    setInstallPrompt(null)
+
+    try {
+      console.log('PWA Debug: Prompting user for installation')
+      installPrompt.prompt()
+      const { outcome } = await installPrompt.userChoice
+      console.log('PWA Debug: User choice:', outcome)
+      
+      if (outcome === 'accepted') {
+        setCanInstall(false)
+        setShowPWABanner(false)
+      }
+      
+      setInstallPrompt(null)
+    } catch (error) {
+      console.error('PWA Debug: Error during installation:', error)
+    }
   }
 
   const handleDismissPWABanner = () => {
+    console.log('PWA Debug: Banner dismissed')
+    
+    // Immediately hide banner and store dismissal
     setShowPWABanner(false)
+    setCanInstall(false) // Also set canInstall to false to prevent re-showing
+    
+    // Store dismissal in localStorage to prevent showing again for a while
+    localStorage.setItem('pwa-banner-dismissed', Date.now().toString())
+    
+    console.log('PWA Debug: Banner state after dismiss - showBanner:', false, 'canInstall:', false)
   }
+
+  // Check if banner was recently dismissed (run once on mount)
+  useEffect(() => {
+    const dismissed = localStorage.getItem('pwa-banner-dismissed')
+    if (dismissed) {
+      const dismissedTime = parseInt(dismissed)
+      const oneDay = 24 * 60 * 60 * 1000 // 24 hours
+      if (Date.now() - dismissedTime < oneDay) {
+        console.log('PWA Debug: Banner was recently dismissed, preventing show')
+        setShowPWABanner(false)
+        setCanInstall(false)
+        return
+      } else {
+        // Clean up old dismissal
+        localStorage.removeItem('pwa-banner-dismissed')
+        console.log('PWA Debug: Old dismissal expired, removed from storage')
+      }
+    }
+  }, [])
 
   const checkAppointments = async () => {
     setLoading(true)
@@ -231,9 +356,11 @@ ${availableResults.length} תאריכים זמינים
       </Head>
 
       {/* PWA Install Banner */}
-      {showPWABanner && canInstall && (
+      {showPWABanner && canInstall && !isStandalone && (
         <PWABanner onInstall={handleInstall} onDismiss={handleDismissPWABanner} />
       )}
+
+
 
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 font-hebrew">
         {/* Status Bar */}

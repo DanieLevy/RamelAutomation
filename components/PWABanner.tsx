@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Download, Smartphone } from 'lucide-react'
+import { X, Download } from 'lucide-react'
 import { Button } from './ui/button'
 
 interface PWABannerProps {
@@ -8,32 +8,25 @@ interface PWABannerProps {
 }
 
 export default function PWABanner({ onInstall, onDismiss }: PWABannerProps) {
-  const [isVisible, setIsVisible] = useState(false)
   const [isAnimating, setIsAnimating] = useState(false)
 
   useEffect(() => {
-    // Show banner with animation
-    setIsVisible(true)
-    setTimeout(() => setIsAnimating(true), 100)
+    // Start animation immediately when component mounts
+    const timer = setTimeout(() => setIsAnimating(true), 50)
+    return () => clearTimeout(timer)
   }, [])
 
   const handleDismiss = () => {
-    setIsAnimating(false)
-    setTimeout(() => {
-      setIsVisible(false)
-      onDismiss()
-    }, 300)
+    console.log('PWA Banner: Dismiss clicked')
+    // Immediately call onDismiss - let parent handle the state
+    onDismiss()
   }
 
   const handleInstall = () => {
-    setIsAnimating(false)
-    setTimeout(() => {
-      setIsVisible(false)
-      onInstall()
-    }, 200)
+    console.log('PWA Banner: Install clicked')
+    // Immediately call onInstall - let parent handle the state
+    onInstall()
   }
-
-  if (!isVisible) return null
 
   return (
     <div className={`fixed top-0 left-0 right-0 z-50 transform transition-all duration-300 ease-out ${
@@ -45,9 +38,21 @@ export default function PWABanner({ onInstall, onDismiss }: PWABannerProps) {
           <div className="flex items-center gap-3">
             {/* App Icon */}
             <div className="flex-shrink-0">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
-                <Smartphone className="w-5 h-5 text-white" />
-              </div>
+              <img 
+                src="/icons/icon-96x96.png" 
+                alt="תור רם-אל"
+                className="w-10 h-10 rounded-xl shadow-md"
+                onError={(e) => {
+                  // Fallback to smaller icon if 96x96 fails
+                  const target = e.target as HTMLImageElement;
+                  if (target.src.includes('96x96')) {
+                    target.src = '/icons/icon-72x72.png';
+                  } else if (target.src.includes('72x72')) {
+                    // Final fallback to favicon
+                    target.src = '/favicon-32x32.png';
+                  }
+                }}
+              />
             </div>
 
             {/* Content */}
