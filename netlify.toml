@@ -13,18 +13,10 @@
   # Global function configuration  
   directory = "netlify/functions"
 
-# Scheduled function to run auto-check every 5 minutes
-[functions."scheduled-check"]
-  schedule = "*/5 * * * *" # every 5 minutes
-  timeout = 900  # 15 minutes maximum (must match auto-check timeout)
-
 # Auto-check function configuration
 [functions."auto-check"]
+  schedule = "*/5 * * * *" # every 5 minutes
   timeout = 900  # 15 minutes maximum (unlimited until we get it working)
-
-# Get cached result function
-[functions."get-cached-result"]
-  timeout = 30   # 30 seconds (fast response)
 
 # Environment variables needed for deployment
 # Set these in Netlify dashboard:
