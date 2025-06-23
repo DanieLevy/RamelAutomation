@@ -386,6 +386,9 @@ ${availableResults.length} תאריכים זמינים
         <title>מספרת רם-אל - מערכת לבדיקת תורים אוטומטית</title>
         <meta name="description" content="מערכת לבדיקת תורים אוטומטית במספרת רם-אל" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {/* Set theme color for iOS notch and browser UI */}
+        <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+        <meta name="theme-color" content="#18181b" media="(prefers-color-scheme: dark)" />
       </Head>
 
       {/* PWA Install Banner */}
@@ -432,12 +435,12 @@ ${availableResults.length} תאריכים זמינים
         <div className="max-w-md mx-auto p-4 space-y-6">
           {/* Header */}
           <div className="text-center space-y-3 pt-4">
-            <div className="flex items-center justify-center gap-3">
-              <div className="relative">
+            <div className="flex flex-col items-center justify-center gap-2">
+              <div className="relative mb-1">
                 <img 
                   src="/icons/icon-96x96.png" 
-                  alt="תור רם-אל" 
-                  className="w-12 h-12 rounded-xl shadow-lg ring-2 ring-white/50 dark:ring-gray-700/50"
+                  alt="מספרת רם-אל" 
+                  className="w-14 h-14 rounded-xl shadow-lg ring-2 ring-white/50 dark:ring-gray-700/50"
                   style={{
                     filter: 'drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1))',
                   }}
