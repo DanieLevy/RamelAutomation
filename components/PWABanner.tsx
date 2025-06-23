@@ -5,9 +5,11 @@ interface PWABannerProps {
   onInstall: () => void
   onDismiss: () => void
   ios?: boolean
+  canInstall?: boolean
+  isIOS?: boolean
 }
 
-export default function PWABanner({ onInstall, onDismiss, ios = false }: PWABannerProps) {
+export default function PWABanner({ onInstall, onDismiss, ios = false, canInstall = true, isIOS = false }: PWABannerProps) {
   const [isVisible, setIsVisible] = useState(false)
 
   useEffect(() => {

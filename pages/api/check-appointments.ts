@@ -2,6 +2,27 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { createClient } from '@supabase/supabase-js';
+import { Agent as HttpAgent } from 'http';
+import { Agent as HttpsAgent } from 'https';
+
+// Create persistent HTTP agents for connection reuse
+const httpAgent = new HttpAgent({ keepAlive: true, maxSockets: 10 });
+const httpsAgent = new HttpsAgent({ keepAlive: true, maxSockets: 10, rejectUnauthorized: false });
+
+// Create axios instance with persistent connection
+const axiosInstance = axios.create({
+  httpAgent,
+  httpsAgent,
+  headers: {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'he-IL,he;q=0.9,en;q=0.8',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Connection': 'keep-alive',
+  },
+  timeout: 5000,
+  responseType: 'arraybuffer'
+});
 
 interface AppointmentResult {
   date: string;
@@ -34,6 +55,10 @@ interface ApiResponse {
     requestsPerSecond: number;
   };
 }
+
+// Cache for HTTP responses (in-memory)
+const responseCache = new Map<string, {data: AppointmentResult, timestamp: number}>();
+const CACHE_TTL = 60 * 1000; // 1 minute TTL for HTTP responses
 
 // Supabase client setup
 const supabase = createClient(
@@ -89,8 +114,17 @@ const getOpenDays = (startDate: Date, totalDays: number): Date[] => {
   return openDays;
 };
 
-// Ultra-fast, parallelized single date check
+// Optimized single date check with caching and connection reuse
 const checkSingleDateOptimized = async (dateStr: string): Promise<AppointmentResult> => {
+  // Check in-memory cache first
+  const cacheKey = `appointment_${dateStr}`;
+  const cachedResponse = responseCache.get(cacheKey);
+  
+  if (cachedResponse && (Date.now() - cachedResponse.timestamp < CACHE_TTL)) {
+    console.log(`Cache hit for date ${dateStr}`);
+    return cachedResponse.data;
+  }
+  
   try {
     const userId = process.env.USER_ID || '4481';
     const codeAuth = process.env.CODE_AUTH || 'Sa1W2GjL';
@@ -101,52 +135,64 @@ const checkSingleDateOptimized = async (dateStr: string): Promise<AppointmentRes
       lang: 'he',
       datef: dateStr
     };
-    const response = await axios.get('https://mytor.co.il/home.php', {
+    
+    // Use the optimized axios instance
+    const response = await axiosInstance.get('https://mytor.co.il/home.php', {
       params,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'he-IL,he;q=0.9,en;q=0.8',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Connection': 'keep-alive',
         'Cookie': `userID=${userId}; codeAuth=${codeAuth}`
-      },
-      timeout: 5000,
-      responseType: 'arraybuffer'
+      }
     });
+    
+    // Use cheerio to parse HTML
     const $ = cheerio.load(response.data);
+    
+    // Fast check for no appointments text
     const dangerText = $('h4.tx-danger').text();
     if (dangerText.includes('לא נשארו תורים פנויים')) {
-      return {
+      const result = {
         date: dateStr,
         available: false,
         message: 'No appointments available',
         times: []
       };
+      
+      // Cache the result
+      responseCache.set(cacheKey, {data: result, timestamp: Date.now()});
+      return result;
     }
+    
+    // Optimized time extraction
     const availableTimes: string[] = [];
-    $('button.btn.btn-outline-dark.btn-block').each((_, element) => {
-      const timeText = $(element).text().trim();
+    const timeButtons = $('button.btn.btn-outline-dark.btn-block');
+    
+    // Use for loop instead of .each() for better performance
+    for (let i = 0; i < timeButtons.length; i++) {
+      const timeText = $(timeButtons[i]).text().trim();
       if (/^\d{1,2}:\d{2}$/.test(timeText)) {
         availableTimes.push(timeText);
       }
-    });
-    if (availableTimes.length > 0) {
-      return {
-        date: dateStr,
-        available: true,
-        message: `Found ${availableTimes.length} available appointments`,
-        times: availableTimes
-      };
-    } else {
-      return {
-        date: dateStr,
-        available: false,
-        message: 'No appointments available',
-        times: []
-      };
     }
+    
+    const result = availableTimes.length > 0 
+      ? {
+          date: dateStr,
+          available: true,
+          message: `Found ${availableTimes.length} available appointments`,
+          times: availableTimes
+        }
+      : {
+          date: dateStr,
+          available: false,
+          message: 'No appointments available',
+          times: []
+        };
+    
+    // Cache the result
+    responseCache.set(cacheKey, {data: result, timestamp: Date.now()});
+    return result;
   } catch (error: any) {
+    console.error(`Error checking date ${dateStr}:`, error.message);
     return {
       date: dateStr,
       available: null,
@@ -156,63 +202,171 @@ const checkSingleDateOptimized = async (dateStr: string): Promise<AppointmentRes
   }
 };
 
-// Parallel batch processing
-const processInBatches = async (dates: string[], batchSize: number = 5): Promise<AppointmentResult[]> => {
+// Optimized parallel batch processing with adaptive batch size
+const processInBatches = async (dates: string[], initialBatchSize: number = 5): Promise<AppointmentResult[]> => {
   const results: AppointmentResult[] = [];
+  let batchSize = initialBatchSize;
+  const totalDates = dates.length;
+  
+  // Adaptive batch sizing based on number of dates
+  if (totalDates > 20) {
+    batchSize = 8; // Larger batch size for more dates
+  } else if (totalDates <= 10) {
+    batchSize = 3; // Smaller batch size for fewer dates
+  }
+  
+  console.log(`Processing ${totalDates} dates with batch size ${batchSize}`);
+  
   for (let i = 0; i < dates.length; i += batchSize) {
     const batch = dates.slice(i, i + batchSize);
     const batchPromises = batch.map(dateStr => checkSingleDateOptimized(dateStr));
-    const batchResults = await Promise.all(batchPromises);
-    results.push(...batchResults);
+    
+    // Use Promise.allSettled to handle partial failures
+    const batchResults = await Promise.allSettled(batchPromises);
+    
+    // Process results, including any that failed
+    batchResults.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        results.push(result.value);
+      } else {
+        // Add an error result for failed promises
+        results.push({
+          date: batch[index],
+          available: null,
+          message: `Error: ${result.reason?.message || 'Unknown error'}`,
+          times: []
+        });
+      }
+    });
+    
+    // Adaptive delay between batches
     if (i + batchSize < dates.length) {
-      await new Promise(resolve => setTimeout(resolve, 50));
+      const delay = Math.min(50, Math.max(20, Math.floor(50 / batchSize))); 
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
+  
   return results;
 };
 
+
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse<ApiResponse | { error: string }>) {
+  // Set CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  
+  // Handle OPTIONS request (preflight)
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+  
+  // Set cache control headers
+  res.setHeader('Cache-Control', 'public, max-age=60');
+  
   try {
+    console.log('Manual check: Starting appointment search');
     const { startDate, days = 7, mode = 'range' } = req.body;
+    console.log(`Manual check: Mode=${mode}, Days=${days}, StartDate=${startDate}`);
+    
     const baseDate = startDate ? new Date(startDate + 'T00:00:00') : getCurrentDateIsrael();
     let datesToCheck: string[];
+    
     if (mode === 'closest') {
       datesToCheck = getOpenDays(baseDate, 30).map(d => formatDateForUrl(d));
+      console.log(`Manual check: Closest mode - will check up to 30 open days`);
     } else {
       const maxDays = Math.min(days, 30);
       datesToCheck = getOpenDays(baseDate, maxDays).map(d => formatDateForUrl(d));
+      console.log(`Manual check: Range mode - will check ${datesToCheck.length} days`);
     }
+    
     const startTime = Date.now();
+    console.log(`Manual check: Will search ${datesToCheck.length} dates in batches`);
+    
     let results: AppointmentResult[] = [];
+    
     if (mode === 'closest') {
-      // Check all dates in parallel, but only return the first available
-      const batchResults = await processInBatches(datesToCheck, 5);
-      const found = batchResults.find(r => r.available === true && r.times.length > 0);
-      if (found) {
-        results = [found];
-      } else {
-        results = [];
+      // Early exit optimization for closest mode
+      // First check if we have any cached results that are available
+      for (const dateStr of datesToCheck.slice(0, 5)) {
+        const cacheKey = `appointment_${dateStr}`;
+        const cachedResponse = responseCache.get(cacheKey);
+        
+        if (cachedResponse && 
+            (Date.now() - cachedResponse.timestamp < CACHE_TTL) && 
+            cachedResponse.data.available === true) {
+          console.log(`Found available appointment in cache for ${dateStr}`);
+          results = [cachedResponse.data];
+          break;
+        }
+      }
+      
+      // If no available appointments found in cache, check all dates
+      if (results.length === 0) {
+        // Check all dates in parallel with early exit
+        for (let i = 0; i < datesToCheck.length; i += 5) {
+          const batch = datesToCheck.slice(i, i + 5);
+          const batchResults = await Promise.all(batch.map(dateStr => checkSingleDateOptimized(dateStr)));
+          
+          // Check if any appointment is available in this batch
+          const found = batchResults.find(r => r.available === true && r.times.length > 0);
+          if (found) {
+            console.log(`Manual check: Found appointment on ${found.date} with ${found.times.length} slots`);
+            results = [found];
+            break; // Early exit once we find an available appointment
+          }
+          
+          // Small delay between batches
+          if (i + 5 < datesToCheck.length) {
+            await new Promise(resolve => setTimeout(resolve, 30));
+          }
+        }
+        
+        // If no appointments found, include a default result
+        if (results.length === 0) {
+          console.log(`Manual check: No appointments found in closest mode`);
+          results = [{
+            date: formatDateForUrl(baseDate),
+            available: false,
+            message: 'לא נמצאו תורים פנויים',
+            times: []
+          }];
+        }
       }
     } else {
-      // Range mode: return all results
-      results = await processInBatches(datesToCheck, 5);
+      // Range mode: return all results with optimized batch processing
+      results = await processInBatches(datesToCheck);
+      console.log(`Manual check: Processed ${results.length} dates in range mode`);
     }
+    
     const endTime = Date.now();
     const totalTime = endTime - startTime;
+    console.log(`Manual check: Search completed in ${totalTime}ms`);
+    
     const availableResults = results.filter(r => r.available === true);
+    console.log(`Manual check: Found ${availableResults.length} dates with available appointments`);
+    
     const earliestAvailable = availableResults.length > 0 ? availableResults[0] : null;
     const totalSlots = availableResults.reduce((sum, r) => sum + r.times.length, 0);
+    console.log(`Manual check: Total available slots: ${totalSlots}`);
+    
+    // Match auto-check response structure
     const response: ApiResponse = {
       results: results,
       summary: {
         mode,
-        found: mode === 'closest' && availableResults.length > 0 ? true : false,
-        date: mode === 'closest' && availableResults.length > 0 ? availableResults[0].date : undefined,
-        times: mode === 'closest' && availableResults.length > 0 ? availableResults[0].times : undefined,
-        message: availableResults.length > 0 ? undefined : 'לא נמצאו תורים פנויים',
+        found: availableResults.length > 0,
+        date: earliestAvailable?.date,
+        times: earliestAvailable?.times,
+        message: availableResults.length > 0 ? 
+          `נמצאו ${availableResults.length} תורים זמינים` : 
+          'לא נמצאו תורים פנויים',
         totalChecked: results.length,
         availableCount: availableResults.length,
         hasAvailable: availableResults.length > 0,
@@ -229,13 +383,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         requestsPerSecond: results.length > 0 ? (results.length / totalTime) * 1000 : 0
       }
     };
-    // Write result to Supabase cache
+    
+    // Save to Supabase cache
+    console.log('Manual check: Writing results to separate cache key');
     await supabase
       .from('cache')
-      .upsert([{ key: 'auto-check', value: { timestamp: Date.now(), result: response } }]);
-    return res.status(200).json(response);
+      .upsert([{ key: 'manual-check', value: { timestamp: Date.now(), result: response } }]);
+    
+    // Return JSON response
+    res.status(200).json(response);
   } catch (error: any) {
-    console.error('API Error:', error);
-    res.status(500).json({ error: 'שגיאה בבדיקת התורים' });
+    console.error('Manual check API error:', error);
+    
+    // Return a structured error that can be handled by the frontend
+    res.status(500).json({ 
+      error: 'שגיאה בבדיקת התורים',
+      results: [{
+        date: req.body.startDate || formatDateForUrl(getCurrentDateIsrael()),
+        available: null,
+        message: `Error: ${error.message || 'Unknown error'}`,
+        times: []
+      }],
+      summary: {
+        mode: req.body.mode || 'range',
+        found: false,
+        message: 'שגיאה בבדיקת התורים'
+      }
+    });
   }
 } 

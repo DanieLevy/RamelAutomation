@@ -29,48 +29,72 @@
 
 @layer base {
   :root {
+    /* Monochrome color palette */
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 0 0% 3.9%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 0 0% 3.9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222.2 84% 4.9%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 0 0% 3.9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 3.9%;
     --radius: 0.5rem;
+
+    /* Special UI colors (use sparingly) */
+    --success: 142 72% 29%;
+    --success-foreground: 0 0% 100%;
+    --pending: 48 96% 53%;
+    --pending-foreground: 0 0% 12%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 84% 4.9%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    /* Monochrome dark palette */
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 14.9%;
+    --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 94.1%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 0 0% 83.1%;
+
+    /* Special UI colors for dark mode */
+    --success: 142 70% 45%;
+    --success-foreground: 0 0% 12%;
+    --pending: 48 96% 60%;
+    --pending-foreground: 0 0% 12%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
   }
 }
 
@@ -200,29 +224,169 @@ a {
 }
 
 /* Mobile optimizations */
+/* Mobile optimizations */
 @media (max-width: 640px) {
   .container {
+    width: 100%;
+    max-width: 100%;
     padding-left: 1rem;
     padding-right: 1rem;
   }
+  
+  .hide-on-mobile {
+    display: none !important;
+  }
+  
+  .mobile-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .mobile-compact {
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.875rem !important;
+  }
+  
+  .mobile-text-sm {
+    font-size: 0.875rem !important;
+  }
+  
+  .mobile-full-width {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
 }
 
-.card, .section, .form, .input, .button, .header, .status-bar {
-  @apply bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-800 dark:text-neutral-100;
+/* Modern UI Components */
+.card-modern {
+  @apply bg-card text-card-foreground rounded-xl border border-border shadow-sm p-4;
 }
 
-input, select, textarea {
-  @apply bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 text-neutral-800 dark:text-neutral-100;
+.card-flat {
+  @apply bg-card text-card-foreground rounded-xl p-4;
 }
 
-h1, h2, h3, h4, h5, h6 {
-  @apply text-neutral-900 dark:text-neutral-100;
+.input-modern {
+  @apply bg-muted/50 border border-input rounded-lg px-3 py-2 text-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-ring w-full;
 }
 
-/* Accent color only for primary buttons */
-.button-primary {
-  @apply bg-emerald-600 hover:bg-emerald-700 text-white;
+.btn-primary {
+  @apply bg-primary text-primary-foreground rounded-lg px-4 py-2 font-medium transition-all duration-200 hover:opacity-90;
 }
 
-/* Remove or minimize other accent colors */
-/* ... existing code ... */ 
+.btn-outline {
+  @apply border border-border bg-transparent hover:bg-muted/70 rounded-lg px-4 py-2 transition-all duration-200;
+}
+
+.btn-ghost {
+  @apply bg-transparent hover:bg-muted/50 rounded-lg px-4 py-2 transition-all duration-200;
+}
+
+.badge {
+  @apply inline-flex items-center px-2 py-1 rounded-full text-xs font-medium;
+}
+
+.badge-primary {
+  @apply bg-primary/10 text-primary;
+}
+
+.badge-outline {
+  @apply border border-border bg-transparent;
+}
+
+/* Modern layout utilities */
+.stack {
+  @apply flex flex-col gap-4;
+}
+
+.stack-sm {
+  @apply flex flex-col gap-2;
+}
+
+.hstack {
+  @apply flex flex-row gap-4 items-center;
+}
+
+.hstack-sm {
+  @apply flex flex-row gap-2 items-center;
+}
+
+.center {
+  @apply flex items-center justify-center;
+}
+
+/* Status indicators */
+.dot {
+  @apply w-2 h-2 rounded-full;
+}
+
+.dot-success {
+  @apply bg-[hsl(var(--success))];
+}
+
+.dot-pending {
+  @apply bg-[hsl(var(--pending))];
+}
+
+.dot-error {
+  @apply bg-destructive;
+}
+
+/* Animation utilities */
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Modern calendar styling */
+.calendar-wrapper {
+  @apply w-full overflow-hidden rounded-xl p-1;
+}
+
+/* Page container */
+.page-container {
+  @apply max-w-screen-sm mx-auto px-4 py-4 flex flex-col min-h-screen;
+}
+
+/* Fix calendar and popover on mobile */
+@media (max-width: 640px) {
+  .page-container {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    width: 100%;
+    max-width: 100% !important;
+  }
+  
+  [data-slot="calendar"] {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  [data-slot="popover-content"] {
+    width: 95vw !important;
+    max-width: 95vw !important;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+} 
