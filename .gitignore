@@ -36,4 +36,10 @@ yarn-error.log*
 next-env.d.ts
 
 # netlify
-.netlify 
+.netlify
+
+# PWA generated files
+public/sw.js
+public/workbox-*.js
+public/sw.js.map
+public/workbox-*.js.map 

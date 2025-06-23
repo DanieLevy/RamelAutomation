@@ -1,5 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Head from 'next/head';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import { Calendar, Clock, Search, Smartphone, Wifi, WifiOff, Share2, Copy, Download, MapPin, ExternalLink } from 'lucide-react';
+import PWABanner from '../components/PWABanner';
 
 interface AppointmentResult {
   date: string;
@@ -9,271 +17,463 @@ interface AppointmentResult {
 }
 
 interface ApiResponse {
-  success: boolean;
-  totalDaysChecked: number;
-  availableAppointments: number;
   results: AppointmentResult[];
   summary: {
-    hasAvailableAppointments: boolean;
-    earliestAvailable: AppointmentResult | null;
-    totalSlots: number;
-  };
-  performance: {
-    totalTimeMs: number;
-    averageRequestTimeMs: number;
-    requestsPerSecond: number;
+    mode: string;
+    found?: boolean;
+    date?: string;
+    times?: string[];
+    totalChecked?: number;
+    availableCount?: number;
+    hasAvailable?: boolean;
+    message?: string;
   };
 }
 
+// Israel timezone utility functions
+const ISRAEL_TIMEZONE = 'Asia/Jerusalem'
+
+const formatDateIsrael = (date: Date): string => {
+  return new Intl.DateTimeFormat('he-IL', {
+    timeZone: ISRAEL_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(date).split('.').reverse().join('-')
+}
+
+const formatDisplayDateIsrael = (dateStr: string): string => {
+  const date = new Date(dateStr + 'T00:00:00')
+  return new Intl.DateTimeFormat('he-IL', {
+    timeZone: ISRAEL_TIMEZONE,
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  }).format(date)
+}
+
+const formatTimeIsrael = (time: string): string => {
+  // Time is already in HH:MM format, just ensure proper display
+  return time
+}
+
+const getCurrentDateIsrael = (): Date => {
+  return new Date(new Intl.DateTimeFormat('en-CA', {
+    timeZone: ISRAEL_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date()) + 'T00:00:00')
+}
+
+const getDayNameHebrew = (dateStr: string): string => {
+  const date = new Date(dateStr + 'T00:00:00')
+  return new Intl.DateTimeFormat('he-IL', {
+    timeZone: ISRAEL_TIMEZONE,
+    weekday: 'long'
+  }).format(date)
+}
+
+const isClosedDay = (dateStr: string): boolean => {
+  const date = new Date(dateStr + 'T00:00:00')
+  const dayOfWeek = new Intl.DateTimeFormat('en-US', {
+    timeZone: ISRAEL_TIMEZONE,
+    weekday: 'long'
+  }).format(date)
+  return dayOfWeek === 'Monday' || dayOfWeek === 'Saturday'
+}
+
+const generateBookingUrl = (dateStr: string): string => {
+  // Convert YYYY-MM-DD to the URL format for the barbershop booking page
+  const baseUrl = 'https://mytor.co.il/home.php'
+  const params = new URLSearchParams({
+    i: 'cmFtZWwzMw==',  // ramel33 encoded
+    s: 'MjY1',         // 265
+    mm: 'y',
+    lang: 'he',
+    datef: dateStr,
+    signup: 'הצג'      // Hebrew for "Show"
+  })
+  
+  return `${baseUrl}?${params.toString()}`
+}
+
 export default function Home() {
-  const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<ApiResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [days, setDays] = useState(30);
+  const [results, setResults] = useState<AppointmentResult[]>([])
+  const [loading, setLoading] = useState(false)
+  const [days, setDays] = useState(7)
+  const [searchMode, setSearchMode] = useState<'range' | 'closest'>('range')
+  const [isOnline, setIsOnline] = useState(true)
+  const [canInstall, setCanInstall] = useState(false)
+  const [installPrompt, setInstallPrompt] = useState<any>(null)
+  const [showPWABanner, setShowPWABanner] = useState(false)
+
+  useEffect(() => {
+    // Check online status
+    setIsOnline(navigator.onLine)
+    
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+    
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+
+    // Handle PWA install prompt
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault()
+      setInstallPrompt(e)
+      setCanInstall(true)
+      setShowPWABanner(true)
+    }
+
+    const handleAppInstalled = () => {
+      setCanInstall(false)
+      setInstallPrompt(null)
+      setShowPWABanner(false)
+    }
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+    window.addEventListener('appinstalled', handleAppInstalled)
+
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+      window.removeEventListener('appinstalled', handleAppInstalled)
+    }
+  }, [])
+
+  const handleInstall = async () => {
+    if (!installPrompt) return
+
+    installPrompt.prompt()
+    const { outcome } = await installPrompt.userChoice
+    
+    if (outcome === 'accepted') {
+      setCanInstall(false)
+      setShowPWABanner(false)
+    }
+    
+    setInstallPrompt(null)
+  }
+
+  const handleDismissPWABanner = () => {
+    setShowPWABanner(false)
+  }
 
   const checkAppointments = async () => {
-    setLoading(true);
-    setError(null);
-    setResults(null);
-
+    setLoading(true)
+    setResults([])
+    
     try {
-      const response = await fetch(`/api/check-appointments?days=${days}`);
-      const data = await response.json();
+      const currentDate = getCurrentDateIsrael()
+      const startDate = formatDateIsrael(currentDate)
+      
+      const response = await fetch('/api/check-appointments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          startDate,
+          days,
+          mode: searchMode
+        }),
+      })
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to check appointments');
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
 
-      setResults(data);
-    } catch (err: any) {
-      setError(err.message);
+      const data = await response.json()
+      setResults(data.results || [])
+    } catch (error) {
+      console.error('Error checking appointments:', error)
+      setResults([{
+        date: formatDateIsrael(getCurrentDateIsrael()),
+        available: null,
+        message: 'שגיאה בבדיקת התורים',
+        times: []
+      }])
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('he-IL', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
+  const handleShare = async () => {
+    const availableResults = results.filter(r => r.available === true)
+    if (availableResults.length === 0) return
+    
+    const text = `נמצאו תורים פנויים ברם-אל! 
+${availableResults.length} תאריכים זמינים 
+התור הקרוב ביותר: ${formatDisplayDateIsrael(availableResults[0].date)} 
+בדוק עכשיו: ${window.location.href}`
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'תור רם-אל', text })
+      } catch (err) {
+        // User cancelled sharing
+      }
+    } else {
+      await navigator.clipboard.writeText(text)
+      // Could add a toast notification here
+    }
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <>
       <Head>
-        <title>Ram-El Barbershop - Appointment Checker</title>
-        <meta name="description" content="Check available appointments at Ram-El Barbershop" />
+        <title>תור רם-אל - בדיקת תורים פנויים</title>
+        <meta name="description" content="בדיקת תורים פנויים במספרת רם-אל" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <main className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">
-              ✂️ Ram-El Barbershop
-            </h1>
-            <p className="text-xl text-gray-600">
-              מחפש תור? בדוק זמינות לתקופה הקרובה
-            </p>
-          </div>
+      {/* PWA Install Banner */}
+      {showPWABanner && canInstall && (
+        <PWABanner onInstall={handleInstall} onDismiss={handleDismissPWABanner} />
+      )}
 
-          {/* Control Panel */}
-          <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-            <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
-              <div className="flex items-center gap-2">
-                <label htmlFor="days" className="text-sm font-medium text-gray-700">
-                  בדוק תורים ל:
-                </label>
-                <select
-                  id="days"
-                  value={days}
-                  onChange={(e) => setDays(Number(e.target.value))}
-                  className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value={7}>7 ימים</option>
-                  <option value={14}>14 ימים</option>
-                  <option value={30}>30 ימים</option>
-                  <option value={60}>60 ימים</option>
-                </select>
-              </div>
-              
-              <button
-                onClick={checkAppointments}
-                disabled={loading}
-                className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium px-6 py-2 rounded-md transition-colors duration-200 flex items-center gap-2"
-              >
-                {loading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                    בודק...
-                  </>
-                ) : (
-                  <>
-                    🔍 בדוק תורים
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* Error Display */}
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-8">
-              <div className="flex items-center">
-                <div className="text-red-600 text-xl ml-3">❌</div>
-                <div>
-                  <h3 className="text-red-800 font-medium">שגיאה</h3>
-                  <p className="text-red-700">{error}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Results */}
-          {results && (
-            <div className="space-y-6">
-              {/* Summary */}
-              <div className={`rounded-lg p-6 ${results.summary.hasAvailableAppointments 
-                ? 'bg-green-50 border border-green-200' 
-                : 'bg-gray-50 border border-gray-200'
-              }`}>
-                <div className="flex items-center justify-between flex-wrap gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="text-3xl">
-                      {results.summary.hasAvailableAppointments ? '🎉' : '😔'}
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-bold text-gray-900">
-                        {results.summary.hasAvailableAppointments 
-                          ? `נמצאו ${results.availableAppointments} תאריכים זמינים!`
-                          : 'לא נמצאו תורים זמינים'
-                        }
-                      </h2>
-                                             <div className="text-gray-600 space-y-1">
-                         <p>נבדקו {results.totalDaysChecked} ימים • סך הכל {results.summary.totalSlots} שעות זמינות</p>
-                         <p className="text-sm">
-                           ⚡ הושלם ב-{(results.performance.totalTimeMs / 1000).toFixed(1)} שניות
-                           • {results.performance.requestsPerSecond} בקשות/שנייה
-                         </p>
-                       </div>
-                    </div>
-                  </div>
-
-                  {results.summary.earliestAvailable && (
-                    <div className="bg-white rounded-lg px-4 py-2 border">
-                      <div className="text-sm text-gray-600">התור הקרוב ביותר:</div>
-                      <div className="font-bold text-green-700">
-                        {formatDate(results.summary.earliestAvailable.date)}
-                      </div>
-                      <div className="text-green-600">
-                        {results.summary.earliestAvailable.times[0]}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Available Appointments */}
-              {results.summary.hasAvailableAppointments && (
-                <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-                  <div className="bg-green-600 text-white px-6 py-3">
-                    <h3 className="text-lg font-bold">תורים זמינים</h3>
-                  </div>
-                  <div className="divide-y divide-gray-200">
-                    {results.results
-                      .filter(result => result.available === true)
-                      .map((result, index) => (
-                        <div key={result.date} className="p-6 hover:bg-gray-50 transition-colors">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h4 className="font-bold text-lg text-gray-900">
-                                {formatDate(result.date)}
-                              </h4>
-                              <p className="text-gray-600 text-sm">{result.date}</p>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-sm text-gray-600 mb-2">
-                                {result.times.length} שעות זמינות
-                              </div>
-                              <div className="flex flex-wrap gap-2 justify-end">
-                                {result.times.map((time, timeIndex) => (
-                                  <span
-                                    key={timeIndex}
-                                    className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium"
-                                  >
-                                    {time}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </div>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 font-hebrew">
+        {/* Status Bar */}
+        <div className={`sticky z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 transition-all duration-300 ${
+          showPWABanner ? 'top-16' : 'top-0'
+        }`}>
+          <div className="max-w-md mx-auto px-4 py-2 flex justify-between items-center text-sm">
+            <div className="flex items-center gap-2">
+              {isOnline ? (
+                <Wifi className="h-4 w-4 text-green-600" />
+              ) : (
+                <WifiOff className="h-4 w-4 text-red-600" />
               )}
-
-              {/* All Results (Collapsed) */}
-              <details className="bg-white rounded-lg shadow">
-                <summary className="cursor-pointer px-6 py-3 bg-gray-50 font-medium text-gray-700 hover:bg-gray-100 transition-colors">
-                  הצג את כל התוצאות ({results.totalDaysChecked} ימים)
-                </summary>
-                <div className="divide-y divide-gray-200 max-h-96 overflow-y-auto">
-                  {results.results.map((result, index) => (
-                    <div key={result.date} className="p-4 text-sm">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <span className="font-medium">{result.date}</span>
-                          <span className="text-gray-500 mr-2">
-                            ({formatDate(result.date).split(',')[0]})
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {result.available === true ? (
-                            <>
-                              <span className="text-green-600">✅</span>
-                              <span className="text-green-700 font-medium">
-                                {result.times.length} תורים
-                              </span>
-                            </>
-                          ) : result.available === false ? (
-                            <>
-                              <span className="text-red-600">❌</span>
-                              <span className="text-gray-600">לא זמין</span>
-                            </>
-                          ) : (
-                            <>
-                              <span className="text-yellow-600">⚠️</span>
-                              <span className="text-gray-600">לא ברור</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </details>
+              <span className="text-xs font-light">
+                {isOnline ? 'מחובר' : 'לא מחובר'}
+              </span>
             </div>
-          )}
+            
+            <div className="flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-blue-600" />
+              <span className="text-xs font-light">ישראל</span>
+            </div>
 
-          {/* Instructions */}
-          <div className="mt-12 bg-blue-50 rounded-lg p-6">
-            <h3 className="font-bold text-blue-900 mb-3">🔧 הגדרות</h3>
-            <div className="text-blue-800 text-sm space-y-2">
-              <p>• הכלי בודק אוטומטית את זמינות התורים באתר Ram-El</p>
-              <p>• התוצאות מתעדכנות בזמן אמת</p>
-              <p>• ניתן לבדוק עד 60 ימים קדימה</p>
-              <p>• מומלץ לבדוק מספר פעמים ביום כי תורים משתחררים</p>
+            <div className="text-xs font-light text-gray-500">
+              {new Intl.DateTimeFormat('he-IL', {
+                timeZone: ISRAEL_TIMEZONE,
+                hour: '2-digit',
+                minute: '2-digit'
+              }).format(new Date())}
             </div>
           </div>
         </div>
-      </main>
-    </div>
-  );
+
+        <div className="max-w-md mx-auto p-4 space-y-6">
+          {/* Header */}
+          <div className="text-center space-y-2 pt-4">
+            <h1 className="text-3xl font-normal text-gray-900 dark:text-white">
+              תור רם-אל
+            </h1>
+            <p className="text-gray-600 dark:text-gray-300 font-light">
+              בדיקת תורים פנויים במספרת
+            </p>
+          </div>
+
+          {/* Search Mode Toggle */}
+          <Card className="font-hebrew">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg font-normal flex items-center gap-2">
+                <Search className="h-5 w-5" />
+                סוג חיפוש
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant={searchMode === 'range' ? 'default' : 'outline'}
+                  onClick={() => setSearchMode('range')}
+                  className="font-light"
+                >
+                  טווח ימים
+                </Button>
+                <Button
+                  variant={searchMode === 'closest' ? 'default' : 'outline'}
+                  onClick={() => setSearchMode('closest')}
+                  className="font-light"
+                >
+                  הקרוב ביותר
+                </Button>
+              </div>
+              
+              <div className="text-sm text-gray-600 dark:text-gray-400 font-light">
+                {searchMode === 'range' 
+                  ? `בדיקת תורים פנויים ב-${days} הימים הקרובים (ללא ימי שני ושבת)`
+                  : 'חיפוש התור הפנוי הקרוב ביותר (עד 30 ימים)'
+                }
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Days Selection (only for range mode) */}
+          {searchMode === 'range' && (
+            <Card className="font-hebrew">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg font-normal flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  כמות ימים
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Select value={days.toString()} onValueChange={(value) => setDays(parseInt(value))}>
+                  <SelectTrigger className="font-light">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="font-hebrew">
+                    <SelectItem value="3" className="font-light">3 ימים</SelectItem>
+                    <SelectItem value="7" className="font-light">7 ימים</SelectItem>
+                    <SelectItem value="14" className="font-light">14 ימים</SelectItem>
+                    <SelectItem value="21" className="font-light">21 ימים</SelectItem>
+                    <SelectItem value="30" className="font-light">30 ימים</SelectItem>
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Check Button */}
+          <Button 
+            onClick={checkAppointments} 
+            disabled={loading}
+            className="w-full h-12 text-lg font-normal"
+          >
+            {loading ? (
+              <div className="flex items-center gap-2">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                <span className="font-light">
+                  {searchMode === 'closest' ? 'מחפש תור קרוב...' : 'בודק תורים...'}
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Search className="h-5 w-5" />
+                <span className="font-light">
+                  {searchMode === 'closest' ? 'חפש תור קרוב' : 'בדוק תורים'}
+                </span>
+              </div>
+            )}
+          </Button>
+
+          {/* Offline Alert */}
+          {!isOnline && (
+            <Alert className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-900/20 font-hebrew">
+              <WifiOff className="h-4 w-4 text-orange-600" />
+              <AlertDescription className="font-light">
+                אין חיבור לאינטרנט. התוצאות המוצגות עשויות להיות לא עדכניות.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Results */}
+          {results.length > 0 && (
+            <div className="space-y-4 font-hebrew">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-normal">תוצאות</h2>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleShare}
+                  className="font-light"
+                >
+                  <Share2 className="h-4 w-4 ml-1" />
+                  שתף
+                </Button>
+              </div>
+
+              <div className="space-y-3">
+                {results.map((result, index) => {
+                  const dayName = getDayNameHebrew(result.date)
+                  const isClosed = isClosedDay(result.date)
+                  
+                  return (
+                    <Card key={index} className={`font-hebrew ${
+                      result.available === true 
+                        ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20'
+                        : result.available === false
+                        ? 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20'
+                        : 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/20'
+                    }`}>
+                      <CardContent className="p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex-1">
+                            <div className="font-normal text-lg">
+                              {formatDisplayDateIsrael(result.date)}
+                            </div>
+                            <div className="text-sm text-gray-600 dark:text-gray-400 font-light">
+                              {dayName}
+                              {isClosed && (
+                                <Badge variant="secondary" className="mr-2 font-light">
+                                  סגור
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-2">
+                            <Badge 
+                              variant={
+                                result.available === true ? "default" :
+                                result.available === false ? "destructive" : "secondary"
+                              }
+                              className="font-light"
+                            >
+                              {result.available === true ? 'פנוי' :
+                               result.available === false ? 'תפוס' : 'לא ידוע'}
+                            </Badge>
+                            
+                            {result.available === true && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => window.open(generateBookingUrl(result.date), '_blank')}
+                                className="font-light h-8 px-3"
+                              >
+                                <ExternalLink className="h-4 w-4 ml-1" />
+                                קבע תור
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+
+                        {result.times && result.times.length > 0 && (
+                          <div className="space-y-2">
+                            <Separator />
+                            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 font-light">
+                              <Clock className="h-4 w-4" />
+                              זמנים פנויים:
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {result.times.map((time, timeIndex) => (
+                                <Badge key={timeIndex} variant="outline" className="time-display font-light">
+                                  {formatTimeIsrael(time)}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {result.message && (
+                          <div className="mt-2 text-sm text-gray-600 dark:text-gray-400 font-light">
+                            {result.message}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  )
 } 

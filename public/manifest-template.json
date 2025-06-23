@@ -1,0 +1,108 @@
+{
+  "name": "Tor Ram-El - בדיקת תורים",
+  "short_name": "Tor Ram-El",
+  "description": "אפליקציה לבדיקת תורים פנויים במספרת רם-אל",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "he",
+  "dir": "rtl",
+  "categories": ["productivity", "lifestyle"],
+  "screenshots": [
+    {
+      "src": "/screenshots/mobile-screenshot.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Mobile view of Tor Ram-El appointment checker"
+    },
+    {
+      "src": "/screenshots/desktop-screenshot.png", 
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Desktop view of Tor Ram-El appointment checker"
+    }
+  ],
+  "icons": [
+    {
+      "src": "/icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "בדוק תורים היום",
+      "short_name": "היום",
+      "description": "בדוק תורים זמינים להיום",
+      "url": "/?days=1",
+      "icons": [{ "src": "/icons/shortcut-today.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "בדוק שבוע",
+      "short_name": "שבוע",
+      "description": "בדוק תורים לשבוע הקרוב",
+      "url": "/?days=7",
+      "icons": [{ "src": "/icons/shortcut-week.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "בדוק חודש",
+      "short_name": "חודש",
+      "description": "בדוק תורים לחודש הקרוב",
+      "url": "/?days=30",
+      "icons": [{ "src": "/icons/shortcut-month.png", "sizes": "96x96" }]
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false,
+  "edge_side_panel": {
+    "preferred_width": 400
+  }
+} 
