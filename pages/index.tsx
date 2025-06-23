@@ -99,6 +99,12 @@ const generateBookingUrl = (dateStr: string): string => {
   return `${baseUrl}?${params.toString()}`
 }
 
+// Utility to detect iOS
+function isIOS() {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+  return /iphone|ipad|ipod/i.test(navigator.userAgent);
+}
+
 export default function Home() {
   const [results, setResults] = useState<AppointmentResult[]>([])
   const [loading, setLoading] = useState(false)
@@ -111,6 +117,7 @@ export default function Home() {
   const [installPrompt, setInstallPrompt] = useState<any>(null)
   const [showPWABanner, setShowPWABanner] = useState(false)
   const [isStandalone, setIsStandalone] = useState(false)
+  const [isIOSDevice, setIsIOSDevice] = useState(false)
 
   useEffect(() => {
     // Check online status
@@ -215,6 +222,8 @@ export default function Home() {
       }
     }
     mediaQuery.addListener(handleDisplayModeChange)
+
+    setIsIOSDevice(isIOS())
 
     return () => {
       window.removeEventListener('online', handleOnline)
@@ -374,17 +383,19 @@ ${availableResults.length} תאריכים זמינים
   return (
     <>
       <Head>
-        <title>תור רם-אל - בדיקת תורים פנויים</title>
-        <meta name="description" content="בדיקת תורים פנויים במספרת רם-אל" />
+        <title>מספרת רם-אל - מערכת לבדיקת תורים אוטומטית</title>
+        <meta name="description" content="מערכת לבדיקת תורים אוטומטית במספרת רם-אל" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
       {/* PWA Install Banner */}
-      {showPWABanner && canInstall && !isStandalone && (
-        <PWABanner onInstall={handleInstall} onDismiss={handleDismissPWABanner} />
+      {showPWABanner && !isStandalone && (
+        isIOSDevice ? (
+          <PWABanner ios onInstall={handleInstall} onDismiss={handleDismissPWABanner} />
+        ) : (
+          canInstall && <PWABanner onInstall={handleInstall} onDismiss={handleDismissPWABanner} />
+        )
       )}
-
-
 
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 font-hebrew">
         {/* Status Bar */}
@@ -434,11 +445,11 @@ ${availableResults.length} תאריכים זמינים
                 <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-white/20 to-transparent pointer-events-none"></div>
               </div>
               <h1 className="text-3xl font-normal text-gray-900 dark:text-white">
-                תור רם-אל
+                מספרת רם-אל
               </h1>
             </div>
             <p className="text-gray-600 dark:text-gray-300 font-light">
-              בדיקת תורים פנויים במספרת
+              מערכת לבדיקת תורים אוטומטית
             </p>
           </div>
 

@@ -5,9 +5,10 @@ import { Button } from './ui/button'
 interface PWABannerProps {
   onInstall: () => void
   onDismiss: () => void
+  ios?: boolean
 }
 
-export default function PWABanner({ onInstall, onDismiss }: PWABannerProps) {
+export default function PWABanner({ onInstall, onDismiss, ios = false }: PWABannerProps) {
   const [isAnimating, setIsAnimating] = useState(false)
 
   useEffect(() => {
@@ -65,22 +66,30 @@ export default function PWABanner({ onInstall, onDismiss }: PWABannerProps) {
                   התקן
                 </span>
               </div>
-              <p className="text-xs text-gray-600 dark:text-gray-300 font-light leading-tight">
-                התקן את האפליקציה למכשיר הביתי לגישה מהירה
-              </p>
+              {ios ? (
+                <p className="text-xs text-gray-600 dark:text-gray-300 font-light leading-tight">
+                  להוספה למסך הבית, יש ללחוץ על כפתור <span style={{fontWeight:'bold'}}>שיתוף</span> <span role="img" aria-label="share">&#x1f5d2;</span> ולבחור <span style={{fontWeight:'bold'}}>'הוסף למסך הבית'</span>
+                </p>
+              ) : (
+                <p className="text-xs text-gray-600 dark:text-gray-300 font-light leading-tight">
+                  התקן את האפליקציה למכשיר הביתי לגישה מהירה
+                </p>
+              )}
             </div>
 
             {/* Actions */}
             <div className="flex items-center gap-2 flex-shrink-0">
-              {/* Install Button */}
-              <Button
-                onClick={handleInstall}
-                size="sm"
-                className="h-8 px-3 text-xs font-normal bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm"
-              >
-                <Download className="w-3 h-3 ml-1" />
-                התקן
-              </Button>
+              {/* Install Button (not for iOS) */}
+              {!ios && (
+                <Button
+                  onClick={handleInstall}
+                  size="sm"
+                  className="h-8 px-3 text-xs font-normal bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm"
+                >
+                  <Download className="w-3 h-3 ml-1" />
+                  התקן
+                </Button>
+              )}
 
               {/* Close Button */}
               <Button
