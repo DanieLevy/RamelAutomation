@@ -1,0 +1,20 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+[functions]
+  directory = ".netlify/functions"
+
+# Environment variables needed for deployment
+# Set these in Netlify dashboard:
+# USER_ID = "4481"
+# CODE_AUTH = "Sa1W2GjL"
+# REQUEST_DELAY_MS = "1000" 
