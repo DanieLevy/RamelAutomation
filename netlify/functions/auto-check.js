@@ -195,8 +195,17 @@ async function findClosestAppointment() {
   
   console.log(`auto-check: Will check ${openDates.length} open dates`)
   
+  // Add execution time tracking
+  const startTime = Date.now()
+  const maxExecutionTime = 50 * 1000 // 50 seconds limit to avoid timeout
+  
   // Check dates sequentially until we find the FIRST available appointment
   for (const date of openDates) {
+    // Check if we're approaching timeout
+    if (Date.now() - startTime > maxExecutionTime) {
+      console.log(`auto-check: Approaching timeout, stopping after ${checkedCount} checks`)
+      break
+    }
     checkedCount++
     const dateStr = formatDateIsrael(date)
     
@@ -217,9 +226,10 @@ async function findClosestAppointment() {
       }
     }
     
-    // Save progress every 5 checks to handle timeouts
-    if (checkedCount % 5 === 0) {
-      console.log(`auto-check: Progress: checked ${checkedCount}/${openDates.length}`)
+    // Save progress every 3 checks and log timing
+    if (checkedCount % 3 === 0) {
+      const elapsed = Math.round((Date.now() - startTime) / 1000)
+      console.log(`auto-check: Progress: checked ${checkedCount}/${openDates.length}, elapsed: ${elapsed}s`)
       const progressData = {
         timestamp: Date.now(),
         result: {
@@ -228,7 +238,8 @@ async function findClosestAppointment() {
             mode: 'closest',
             found: false,
             totalChecked: checkedCount,
-            message: `בדקתי ${checkedCount} מתוך ${openDates.length} תאריכים - עדיין מחפש...`
+            message: `בדקתי ${checkedCount} מתוך ${openDates.length} תאריכים - עדיין מחפש...`,
+            elapsed: elapsed
           }
         }
       }
@@ -236,18 +247,22 @@ async function findClosestAppointment() {
     }
     
     // Add delay between requests to be respectful and avoid rate limiting
-    const delay = process.env.NETLIFY_DEV ? 300 : 1000 // 300ms for dev, 1000ms for prod
+    // Reduced delay for faster execution within timeout limits
+    const delay = process.env.NETLIFY_DEV ? 200 : 500 // 200ms for dev, 500ms for prod
     await new Promise(resolve => setTimeout(resolve, delay))
   }
   
-  console.log(`auto-check: No appointments found after checking ${checkedCount} days`)
+  const elapsed = Math.round((Date.now() - startTime) / 1000)
+  console.log(`auto-check: No appointments found after checking ${checkedCount} days in ${elapsed}s`)
   return {
     results: [],
     summary: {
       mode: 'closest',
       found: false,
       totalChecked: checkedCount,
-      message: 'לא נמצאו תורים פנויים ב-30 הימים הקרובים'
+      message: `לא נמצאו תורים פנויים (נבדקו ${checkedCount} תאריכים)`,
+      elapsed: elapsed,
+      completedAt: new Date().toISOString()
     }
   }
 }
@@ -267,7 +282,9 @@ exports.handler = async (event, context) => {
     // Write to file cache
     writeCacheToFile(cacheData)
     
+    // Also write result to environment variable or database here if needed for persistence
     console.log('auto-check: Function completed successfully')
+    console.log('auto-check: Final result summary:', JSON.stringify(result.summary, null, 2))
     
     return {
       statusCode: 200,
