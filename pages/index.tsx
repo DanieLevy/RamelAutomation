@@ -102,6 +102,8 @@ const generateBookingUrl = (dateStr: string): string => {
 export default function Home() {
   const [results, setResults] = useState<AppointmentResult[]>([])
   const [loading, setLoading] = useState(false)
+  const [cachedResult, setCachedResult] = useState<any>(null)
+  const [loadingCached, setLoadingCached] = useState(true)
   const [days, setDays] = useState(7)
   const [searchMode, setSearchMode] = useState<'range' | 'closest'>('closest')
   const [isOnline, setIsOnline] = useState(true)
@@ -287,6 +289,28 @@ export default function Home() {
     }
   }, [])
 
+  // Load cached results on mount
+  useEffect(() => {
+    const loadCachedResults = async () => {
+      try {
+        const response = await fetch('/.netlify/functions/get-cached-result')
+        if (response.ok) {
+          const data = await response.json()
+          if (data.cached && data.summary?.found) {
+            setCachedResult(data)
+            console.log('Loaded cached appointment result:', data)
+          }
+        }
+      } catch (error) {
+        console.error('Error loading cached results:', error)
+      } finally {
+        setLoadingCached(false)
+      }
+    }
+
+    loadCachedResults()
+  }, [])
+
   const checkAppointments = async () => {
     setLoading(true)
     setResults([])
@@ -396,14 +420,77 @@ ${availableResults.length} תאריכים זמינים
 
         <div className="max-w-md mx-auto p-4 space-y-6">
           {/* Header */}
-          <div className="text-center space-y-2 pt-4">
-            <h1 className="text-3xl font-normal text-gray-900 dark:text-white">
-              תור רם-אל
-            </h1>
+          <div className="text-center space-y-3 pt-4">
+            <div className="flex items-center justify-center gap-3">
+              <div className="relative">
+                <img 
+                  src="/icons/icon-96x96.png" 
+                  alt="תור רם-אל" 
+                  className="w-12 h-12 rounded-xl shadow-lg ring-2 ring-white/50 dark:ring-gray-700/50"
+                  style={{
+                    filter: 'drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1))',
+                  }}
+                />
+                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-white/20 to-transparent pointer-events-none"></div>
+              </div>
+              <h1 className="text-3xl font-normal text-gray-900 dark:text-white">
+                תור רם-אל
+              </h1>
+            </div>
             <p className="text-gray-600 dark:text-gray-300 font-light">
               בדיקת תורים פנויים במספרת
             </p>
           </div>
+
+          {/* Auto-Check Results */}
+          {!loadingCached && cachedResult && (
+            <Card className="font-hebrew border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg font-normal flex items-center gap-2 text-green-800 dark:text-green-200">
+                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                  תור קרוב נמצא אוטומטית
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="text-center">
+                  <div className="text-2xl font-light text-green-900 dark:text-green-100">
+                    {formatDisplayDateIsrael(cachedResult.summary.date)}
+                  </div>
+                  <div className="text-sm text-green-700 dark:text-green-300">
+                    {getDayNameHebrew(cachedResult.summary.date)}
+                  </div>
+                </div>
+                
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {cachedResult.summary.times?.map((time: string, index: number) => (
+                    <Badge key={index} variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
+                      {formatTimeIsrael(time)}
+                    </Badge>
+                  ))}
+                </div>
+                
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => window.open(generateBookingUrl(cachedResult.summary.date), '_blank')}
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white font-light"
+                  >
+                    קבע תור
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleShare}
+                    className="border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-300"
+                  >
+                    <Share2 className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                <div className="text-xs text-green-600 dark:text-green-400 text-center">
+                  בדיקה אוטומטית מ-{cachedResult.lastCheck} ({cachedResult.cacheAge} דקות)
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Search Mode Toggle */}
           <Card className="font-hebrew">

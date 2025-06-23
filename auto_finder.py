@@ -40,7 +40,7 @@ class BarbershopChecker:
             'Sec-Fetch-User': '?1',
             'Upgrade-Insecure-Requests': '1'
         })
-        
+
         # Set authentication cookies if provided
         if user_id and code_auth:
             self.session.cookies.set('userID', user_id)
@@ -124,12 +124,12 @@ class BarbershopChecker:
                 element_text = element.get_text().strip()
                 for msg in no_appointments_messages:
                     if msg in element_text:
-                        return {
-                            'date': date_obj.strftime('%Y-%m-%d'),
-                            'available': False,
-                            'message': 'No appointments available',
-                            'times': []
-                        }
+                return {
+                    'date': date_obj.strftime('%Y-%m-%d'),
+                    'available': False,
+                    'message': 'No appointments available',
+                    'times': []
+                }
             
             # Look for appointment time buttons
             time_buttons = soup.find_all('button', class_='btn btn-outline-dark btn-block')

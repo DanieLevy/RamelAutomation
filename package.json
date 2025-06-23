@@ -11,6 +11,7 @@
     "pwa:build": "npm run generate:icons && npm run build"
   },
   "dependencies": {
+    "@netlify/functions": "^4.1.6",
     "@radix-ui/react-select": "^2.2.5",
     "@radix-ui/react-separator": "^1.1.7",
     "@radix-ui/react-slot": "^1.2.3",
