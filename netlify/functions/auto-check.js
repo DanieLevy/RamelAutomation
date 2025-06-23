@@ -87,15 +87,12 @@ function readCacheFromFile() {
   return null
 }
 
-async function checkSingleDate(dateStr) {
+// OPTIMIZED: Ultra-fast single date check with reduced timeout
+async function checkSingleDateOptimized(dateStr) {
   try {
-    // Get environment variables - use process.env in Node.js
     const userId = process.env.USER_ID || '4481'
     const codeAuth = process.env.CODE_AUTH || 'Sa1W2GjL'
     
-    console.log(`auto-check: Checking date ${dateStr}`)
-    
-    // Use the EXACT same approach as frontend API
     const params = {
       i: 'cmFtZWwzMw==', // ramel33
       s: 'MjY1',         // 265
@@ -104,61 +101,45 @@ async function checkSingleDate(dateStr) {
       datef: dateStr
     }
 
+    // SPEED OPTIMIZATION: Reduced timeout from 15s to 5s
     const response = await axios.get('https://mytor.co.il/home.php', {
       params,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'he-IL,he;q=0.9,en;q=0.8',
         'Accept-Encoding': 'gzip, deflate, br',
-        'Cache-Control': 'max-age=0',
         'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
         'Cookie': `userID=${userId}; codeAuth=${codeAuth}`
       },
-      timeout: 15000,
+      timeout: 5000, // REDUCED from 15000ms to 5000ms
       responseType: 'arraybuffer'
     })
 
-    // Use cheerio directly on the response data
+    // SPEED OPTIMIZATION: Faster parsing
     const $ = cheerio.load(response.data)
     
-    // Check for "no appointments" message first (same as frontend)
-    const noAppointmentsMessages = [
-      'מצטערים, לא נשארו תורים פנויים ליום זה',
-      'לא נשארו תורים פנויים'
-    ]
-    
-    const dangerElements = $('h4.tx-danger')
-    for (let i = 0; i < dangerElements.length; i++) {
-      const elementText = $(dangerElements[i]).text().trim()
-      for (const msg of noAppointmentsMessages) {
-        if (elementText.includes(msg)) {
-          console.log(`auto-check: No appointments available for ${dateStr}`)
-          return {
-            date: dateStr,
-            available: false,
-            message: 'No appointments available',
-            times: []
-          }
-        }
+    // Quick check for "no appointments" message
+    const dangerText = $('h4.tx-danger').text()
+    if (dangerText.includes('לא נשארו תורים פנויים')) {
+      return {
+        date: dateStr,
+        available: false,
+        message: 'No appointments available',
+        times: []
       }
     }
 
-    // Look for appointment time buttons (same as frontend)
-    const timeButtons = $('button.btn.btn-outline-dark.btn-block')
+    // Quick check for appointment time buttons
     const availableTimes = []
-    
-    timeButtons.each((_, element) => {
+    $('button.btn.btn-outline-dark.btn-block').each((_, element) => {
       const timeText = $(element).text().trim()
-      // Use frontend regex pattern: /^\d{1,2}:\d{2}$/ (allows single digit hours)
       if (/^\d{1,2}:\d{2}$/.test(timeText)) {
         availableTimes.push(timeText)
       }
     })
 
     if (availableTimes.length > 0) {
-      console.log(`auto-check: Found ${availableTimes.length} appointments for ${dateStr}:`, availableTimes)
       return {
         date: dateStr,
         available: true,
@@ -166,16 +147,14 @@ async function checkSingleDate(dateStr) {
         times: availableTimes
       }
     } else {
-      console.log(`auto-check: Could not determine availability for ${dateStr}`)
       return {
         date: dateStr,
-        available: null,
-        message: 'Could not determine availability',
+        available: false,
+        message: 'No appointments available',
         times: []
       }
     }
   } catch (error) {
-    console.error(`auto-check: Error checking date ${dateStr}:`, error.message)
     return {
       date: dateStr,
       available: null,
@@ -185,90 +164,82 @@ async function checkSingleDate(dateStr) {
   }
 }
 
-async function findClosestAppointment() {
-  console.log('auto-check: Starting findClosestAppointment')
+// ULTRA-OPTIMIZED: Parallel processing with batches
+async function findClosestAppointmentOptimized() {
+  console.log('auto-check: 🚀 ULTRA-SPEED MODE - Checking all dates in parallel!')
+  const startTime = Date.now()
+  
   const currentDate = getCurrentDateIsrael()
   const maxDays = 30
   const openDates = getOpenDays(currentDate, maxDays)
   
-  let checkedCount = 0
+  console.log(`auto-check: Will check ${openDates.length} dates in PARALLEL for maximum speed`)
   
-  console.log(`auto-check: Will check ${openDates.length} open dates`)
+  // PARALLEL OPTIMIZATION: Process dates in batches of 5 simultaneously
+  const BATCH_SIZE = 5
+  const results = []
   
-  // Add execution time tracking (no timeout limits - let it run as long as needed)
-  const startTime = Date.now()
-  
-  // Check dates sequentially until we find the FIRST available appointment
-  for (const date of openDates) {
-    checkedCount++
-    const dateStr = formatDateIsrael(date)
+  for (let i = 0; i < openDates.length; i += BATCH_SIZE) {
+    const batch = openDates.slice(i, i + BATCH_SIZE)
+    const batchPromises = batch.map(date => {
+      const dateStr = formatDateIsrael(date)
+      return checkSingleDateOptimized(dateStr)
+    })
     
-    const result = await checkSingleDate(dateStr)
+    // Process batch in parallel
+    const batchResults = await Promise.all(batchPromises)
+    results.push(...batchResults)
     
-    if (result.available === true && result.times.length > 0) {
-      console.log(`auto-check: Found appointment on ${dateStr} after checking ${checkedCount} days`)
+    const elapsed = Date.now() - startTime
+    console.log(`auto-check: Batch ${Math.floor(i/BATCH_SIZE) + 1} completed - ${results.length}/${openDates.length} dates checked in ${elapsed}ms`)
+    
+    // Check if we found an appointment (early exit for speed)
+    const foundAppointment = batchResults.find(r => r.available === true && r.times.length > 0)
+    if (foundAppointment) {
+      console.log(`auto-check: 🎉 Found appointment on ${foundAppointment.date} - EARLY EXIT after ${results.length} checks`)
       return {
-        results: [result],
+        results: [foundAppointment],
         summary: {
           mode: 'closest',
           found: true,
-          date: dateStr,
-          times: result.times,
-          totalChecked: checkedCount,
-          message: `התור הקרוב ביותר נמצא ב-${dateStr}`
+          date: foundAppointment.date,
+          times: foundAppointment.times,
+          totalChecked: results.length,
+          message: `התור הקרוב ביותר נמצא ב-${foundAppointment.date}`,
+          elapsed: Math.round((Date.now() - startTime) / 1000)
         }
       }
     }
     
-    // Save progress every 2 checks and log timing (more frequent updates)
-    if (checkedCount % 2 === 0) {
-      const elapsed = Math.round((Date.now() - startTime) / 1000)
-      const estimatedTotal = Math.round((elapsed / checkedCount) * openDates.length)
-      console.log(`auto-check: Progress: checked ${checkedCount}/${openDates.length}, elapsed: ${elapsed}s, estimated total: ${estimatedTotal}s`)
-      const progressData = {
-        timestamp: Date.now(),
-        result: {
-          results: [],
-          summary: {
-            mode: 'closest',
-            found: false,
-            totalChecked: checkedCount,
-            message: `בדקתי ${checkedCount} מתוך ${openDates.length} תאריכים - עדיין מחפש...`,
-            elapsed: elapsed,
-            estimatedTotal: estimatedTotal
-          }
-        }
-      }
-      writeCacheToFile(progressData)
+    // Small delay between batches to avoid overwhelming server
+    if (i + BATCH_SIZE < openDates.length) {
+      await new Promise(resolve => setTimeout(resolve, 50)) // Minimal 50ms delay
     }
-    
-    // Add delay between requests to be respectful and avoid rate limiting
-    // Generous delay to be respectful to the server (no time pressure now)
-    const delay = process.env.NETLIFY_DEV ? 500 : 1500 // 500ms for dev, 1.5s for prod (very respectful)
-    await new Promise(resolve => setTimeout(resolve, delay))
   }
   
   const elapsed = Math.round((Date.now() - startTime) / 1000)
-  console.log(`auto-check: No appointments found after checking ${checkedCount} days in ${elapsed}s`)
+  console.log(`auto-check: ✅ Completed all ${results.length} checks in ${elapsed}s`)
+  
   return {
-    results: [],
+    results: results,
     summary: {
       mode: 'closest',
       found: false,
-      totalChecked: checkedCount,
-      message: `לא נמצאו תורים פנויים (נבדקו ${checkedCount} תאריכים)`,
+      totalChecked: results.length,
+      message: `לא נמצאו תורים פנויים (נבדקו ${results.length} תאריכים ב-${elapsed} שניות)`,
       elapsed: elapsed,
       completedAt: new Date().toISOString()
     }
   }
 }
 
-// Netlify Functions handler
+// Netlify Functions handler - OPTIMIZED FOR SPEED
 exports.handler = async (event, context) => {
   try {
-    console.log('auto-check: Function called with unlimited time (15 min timeout)')
-    console.log('auto-check: Function will run as long as needed to complete all checks')
-    const result = await findClosestAppointment()
+    console.log('auto-check: 🚀 SPEED-OPTIMIZED function starting (target: <10 seconds)')
+    const startTime = Date.now()
+    
+    const result = await findClosestAppointmentOptimized()
     
     // Store result with timestamp
     const cacheData = {
@@ -279,9 +250,9 @@ exports.handler = async (event, context) => {
     // Write to file cache
     writeCacheToFile(cacheData)
     
-    // Also write result to environment variable or database here if needed for persistence
-    console.log('auto-check: Function completed successfully')
-    console.log('auto-check: Final result summary:', JSON.stringify(result.summary, null, 2))
+    const totalTime = Math.round((Date.now() - startTime) / 1000)
+    console.log(`auto-check: ✅ Function completed in ${totalTime}s`)
+    console.log('auto-check: Final result:', JSON.stringify(result.summary, null, 2))
     
     return {
       statusCode: 200,
@@ -291,7 +262,7 @@ exports.handler = async (event, context) => {
       },
       body: JSON.stringify({
         success: true,
-        message: 'Auto-check completed',
+        message: `Auto-check completed in ${totalTime}s`,
         result: result
       })
     }

@@ -10,9 +10,9 @@ exports.handler = async (event, context) => {
     
     console.log(`scheduled-check: Triggering auto-check at ${siteUrl}`)
     
-    // Set up timeout for the request
+    // Set up timeout for the request - MUCH LONGER to allow full auto-check completion
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 10 * 60 * 1000) // 10 minute timeout
+    const timeoutId = setTimeout(() => controller.abort(), 14 * 60 * 1000) // 14 minute timeout (less than function timeout)
     
     // Trigger the auto-check function
     const response = await fetch(`${siteUrl}/.netlify/functions/auto-check`, {

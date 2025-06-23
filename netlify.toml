@@ -10,13 +10,13 @@
   package = "@netlify/plugin-nextjs"
 
 [functions]
-  # Global function configuration
+  # Global function configuration  
   directory = "netlify/functions"
 
 # Scheduled function to run auto-check every 5 minutes
 [functions."scheduled-check"]
   schedule = "*/5 * * * *" # every 5 minutes
-  timeout = 900  # 15 minutes maximum
+  timeout = 900  # 15 minutes maximum (must match auto-check timeout)
 
 # Auto-check function configuration
 [functions."auto-check"]
