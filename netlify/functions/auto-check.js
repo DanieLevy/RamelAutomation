@@ -248,6 +248,9 @@ exports.handler = async (event, context) => {
         if (match) {
           // 2. Send email
           const unsubscribeUrl = `https://tor-ramel.netlify.app/api/unsubscribe?token=${notif.unsubscribe_token}`
+          const availableTimes = Array.isArray(result.summary.times) && result.summary.times.length > 0
+            ? result.summary.times.join(', ')
+            : 'לא צוינו זמנים';
           const transporter = nodemailer.createTransport({
             service: 'gmail',
             auth: {
@@ -259,8 +262,10 @@ exports.handler = async (event, context) => {
             from: `"Barber Alert" <${process.env.EMAIL_SENDER}>`,
             to: notif.email,
             subject: 'תור פנוי במספרת רם-אל!',
-            text: `נמצא תור פנוי לתאריך ${result.summary.date}.\nלהסרה מההתראות: ${unsubscribeUrl}`,
-            html: `<p>נמצא תור פנוי לתאריך <b>${result.summary.date}</b>.</p><p><a href="${unsubscribeUrl}">להסרה מההתראות</a></p>`
+            text: `נמצא תור פנוי לתאריך ${result.summary.date}.
+זמנים פנויים: ${availableTimes}
+להסרה מההתראות: ${unsubscribeUrl}`,
+            html: `<p>נמצא תור פנוי לתאריך <b>${result.summary.date}</b>.</p><p>זמנים פנויים: <b>${availableTimes}</b></p><p><a href="${unsubscribeUrl}">להסרה מההתראות</a></p>`
           }
           try {
             await transporter.sendMail(mailOptions)

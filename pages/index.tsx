@@ -155,6 +155,8 @@ export default function Home() {
   const [notifyStatus, setNotifyStatus] = useState<string | null>(null)
   const [notifyLoading, setNotifyLoading] = useState(false)
   const [notifyType, setNotifyType] = useState<'single' | 'range'>('single')
+  const [notifyEmail, setNotifyEmail] = useState('')
+  const [notifyDate, setNotifyDate] = useState<string | { start: string; end: string }>('')
 
   useEffect(() => {
     // Check online status
@@ -452,397 +454,231 @@ ${availableResults.length} תאריכים זמינים
     }).format(lastCheckDate);
   }
 
+  const handleNotifySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setNotifyStatus(null);
+    const form = e.target as HTMLFormElement;
+    const email = (form.email as HTMLInputElement).value;
+    const date = typeof notifyDate === 'string' ? notifyDate : notifyDate.start || '';
+    if (!email || !date) {
+      setNotifyStatus('נא למלא אימייל ותאריך');
+      return;
+    }
+    setNotifyLoading(true);
+    try {
+      const res = await fetch('/api/notify-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, date }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setNotifyStatus('נרשמת בהצלחה! תקבל התראה אם יימצא תור.');
+      } else {
+        setNotifyStatus(data.error || 'שגיאה בהרשמה');
+      }
+    } catch (err) {
+      setNotifyStatus('שגיאה בהרשמה');
+    } finally {
+      setNotifyLoading(false);
+    }
+  }
+
   return (
-    <>
-      <Head>
-        <title>מספרת רם-אל - מערכת לבדיקת תורים אוטומטית</title>
-        <meta name="description" content="מערכת לבדיקת תורים אוטומטית במספרת רם-אל" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        {/* Set theme color for iOS notch and browser UI */}
-        <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
-        <meta name="theme-color" content="#18181b" media="(prefers-color-scheme: dark)" />
-      </Head>
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 flex flex-col items-center px-2">
+      <div className="w-full max-w-sm mx-auto flex flex-col gap-6 py-6">
+        {/* Header */}
+        <header className="w-full flex flex-col items-center">
+          <img src="/icons/icon-96x96.png" className="w-14 h-14 rounded-xl mb-2 shadow-md" alt="Logo" />
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">מספרת רם-אל</h1>
+          <p className="text-gray-500 dark:text-gray-300 text-sm mt-1">בדיקת תורים אוטומטית</p>
+        </header>
 
-      {/* PWA Install Banner */}
-      {showPWABanner && !isStandalone && (
-        isIOSDevice ? (
-          <PWABanner ios onInstall={handleInstall} onDismiss={handleDismissPWABanner} />
-        ) : (
-          canInstall && <PWABanner onInstall={handleInstall} onDismiss={handleDismissPWABanner} />
-        )
-      )}
-
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 font-hebrew">
         {/* Status Bar */}
-        <div className="sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700">
-          <div className="max-w-md mx-auto px-4 py-2 flex justify-between items-center text-sm">
-            <div className="flex items-center gap-2">
-              {isOnline ? (
-                <Wifi className="h-4 w-4 text-green-600" />
-              ) : (
-                <WifiOff className="h-4 w-4 text-red-600" />
-              )}
-              <span className="text-xs font-light">
-                {isOnline ? 'מחובר' : 'לא מחובר'}
-              </span>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-blue-600" />
-              <span className="text-xs font-light">ישראל</span>
-            </div>
-
-            <div className="text-xs font-light text-gray-500">
-              {new Intl.DateTimeFormat('he-IL', {
-                timeZone: ISRAEL_TIMEZONE,
-                hour: '2-digit',
-                minute: '2-digit'
-              }).format(new Date())}
-            </div>
+        <div className="w-full flex justify-between items-center text-xs text-gray-400">
+          <div className="flex items-center gap-1">
+            {isOnline ? <Wifi className="h-4 w-4 text-emerald-500" /> : <WifiOff className="h-4 w-4 text-red-500" />}
+            <span>{isOnline ? 'מחובר' : 'לא מחובר'}</span>
           </div>
+          <div className="flex items-center gap-1">
+            <MapPin className="h-4 w-4 text-blue-500" />
+            <span>ישראל</span>
+          </div>
+          <span>{new Intl.DateTimeFormat('he-IL', { timeZone: ISRAEL_TIMEZONE, hour: '2-digit', minute: '2-digit' }).format(new Date())}</span>
         </div>
 
-        <div className={`max-w-md mx-auto p-4 space-y-6 ${showPWABanner ? 'pb-24' : 'pb-4'}`}>
-          {/* Header */}
-          <div className="text-center space-y-3 pt-4">
-            <div className="flex flex-col items-center justify-center gap-2">
-              <div className="relative mb-1">
-                <img 
-                  src="/icons/icon-96x96.png" 
-                  alt="מספרת רם-אל" 
-                  className="w-14 h-14 rounded-xl shadow-lg ring-2 ring-white/50 dark:ring-gray-700/50"
-                  style={{
-                    filter: 'drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1))',
-                  }}
-                />
-                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-white/20 to-transparent pointer-events-none"></div>
+        {/* Appointment Card */}
+        <section className="w-full bg-white dark:bg-gray-800 rounded-xl shadow-md p-4">
+          <h2 className="text-base font-semibold text-gray-700 dark:text-gray-200 mb-2 mt-2 text-right w-full">התור הקרוב ביותר שנמצא</h2>
+          {!loadingCached && cachedSummary && cachedFound ? (
+            <div className="flex flex-col items-center text-center gap-2">
+              <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-300 text-xs font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                התור הכי קרוב
+                <span className="text-gray-400 dark:text-gray-500 text-[11px] font-normal ml-1">— נמצא אוטומטית</span>
+              </span>
+              <div className="text-xl font-bold text-emerald-900 dark:text-emerald-100 leading-tight">
+                {formatDisplayDateIsrael(cachedDate)}
               </div>
-              <h1 className="text-3xl font-normal text-gray-900 dark:text-white">
-                מספרת רם-אל
-              </h1>
-            </div>
-            <p className="text-gray-600 dark:text-gray-300 font-light">
-              מערכת לבדיקת תורים אוטומטית
-            </p>
-          </div>
-
-          {/* Auto-Check Results */}
-          {!loadingCached && (
-            <>
-              {cachedSummary && cachedFound ? (
-                <div className="font-hebrew rounded-xl bg-white/80 dark:bg-gray-900/80 shadow-sm border border-emerald-100 dark:border-emerald-900 px-4 py-5 flex flex-col items-center text-center space-y-3">
-                  <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-300 text-xs font-medium mb-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    התור הכי קרוב
-                    <span className="text-gray-400 dark:text-gray-500 text-[11px] font-normal ml-1">— נמצא אוטומטית</span>
+              <div className="text-emerald-700 dark:text-emerald-300 text-sm font-medium">
+                {getDayNameHebrew(cachedDate)}
+              </div>
+              <div className="flex flex-wrap gap-1 justify-center">
+                {cachedTimes?.map((time: string, index: number) => (
+                  <span key={index} className="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-200 text-xs font-semibold">
+                    {formatTimeIsrael(time)}
                   </span>
-                  <div className="text-2xl font-bold text-emerald-900 dark:text-emerald-100 leading-tight">
-                    {formatDisplayDateIsrael(cachedDate)}
-                  </div>
-                  <div className="text-emerald-700 dark:text-emerald-300 text-sm font-medium mb-1">
-                    {getDayNameHebrew(cachedDate)}
-                  </div>
-                  <div className="flex flex-wrap gap-1 justify-center">
-                    {cachedTimes?.map((time: string, index: number) => (
-                      <span key={index} className="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-200 text-xs font-semibold">
-                        {formatTimeIsrael(time)}
-                      </span>
-                    ))}
-                  </div>
-                  <Button
-                    onClick={() => window.open(generateBookingUrl(cachedDate), '_blank')}
-                    className="w-full h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg mt-2 shadow-sm"
-                  >
-                    קבע תור עכשיו
-                  </Button>
-                  {lastCheckMinutesAgo !== null && (
-                    <div className="text-[11px] text-gray-400 mt-2 flex items-center justify-center gap-1">
-                      <span aria-label="עודכן לאחרונה" title={lastCheckDisplay || ''}>⏱️</span>
-                      <span>עודכן לפני {lastCheckMinutesAgo} דקות</span>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="font-hebrew text-center py-2">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 text-xs">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
-                    בדיקה אוטומטית כל 5 דקות
-                  </div>
+                ))}
+              </div>
+              <Button
+                onClick={() => window.open(generateBookingUrl(cachedDate), '_blank')}
+                className="w-full h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg mt-2 shadow-sm"
+              >
+                קבע תור עכשיו
+              </Button>
+              {lastCheckMinutesAgo !== null && (
+                <div className="text-[11px] text-gray-400 mt-2 flex items-center justify-center gap-1">
+                  <span aria-label="עודכן לאחרונה" title={lastCheckDisplay || ''}>⏱️</span>
+                  <span>עודכן לפני {lastCheckMinutesAgo} דקות</span>
                 </div>
               )}
-            </>
-          )}
-          
-          {loadingCached && (
-            <Card className="font-hebrew border-gray-200 bg-gray-50 dark:bg-gray-800/20 dark:border-gray-700">
-              <CardContent className="p-4 text-center">
-                <div className="flex items-center justify-center gap-2">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-                  <span className="text-gray-600 dark:text-gray-400 font-light">
-                    טוען תוצאות אוטומטיות...
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Search Mode Toggle */}
-          <Card className="font-hebrew">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-normal flex items-center gap-2">
-                <Search className="h-5 w-5" />
-                סוג חיפוש
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  variant={searchMode === 'range' ? 'default' : 'outline'}
-                  onClick={() => setSearchMode('range')}
-                  className="font-light"
-                >
-                  טווח ימים
-                </Button>
-                <Button
-                  variant={searchMode === 'closest' ? 'default' : 'outline'}
-                  onClick={() => setSearchMode('closest')}
-                  className="font-light"
-                >
-                  הקרוב ביותר
-                </Button>
+            </div>
+          ) : loadingCached ? (
+            <div className="flex flex-col items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>
+              <span className="text-gray-600 dark:text-gray-400 font-light">טוען תוצאות אוטומטיות...</span>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-6">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 text-xs mb-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
+                בדיקה אוטומטית כל 5 דקות
               </div>
-              
-              <div className="text-sm text-gray-600 dark:text-gray-400 font-light">
-                {searchMode === 'range' 
-                  ? `בדיקת תורים פנויים ב-${days} הימים הקרובים (ללא ימי שני ושבת)`
-                  : 'חיפוש התור הפנוי הקרוב ביותר (עד 30 ימים)'
-                }
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Days Selection (only for range mode) */}
-          {searchMode === 'range' && (
-            <Card className="font-hebrew">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg font-normal flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  כמות ימים
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Select value={days.toString()} onValueChange={(value) => setDays(parseInt(value))}>
-                  <SelectTrigger className="font-light">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="font-hebrew">
-                    <SelectItem value="3" className="font-light">3 ימים</SelectItem>
-                    <SelectItem value="7" className="font-light">7 ימים</SelectItem>
-                    <SelectItem value="14" className="font-light">14 ימים</SelectItem>
-                    <SelectItem value="21" className="font-light">21 ימים</SelectItem>
-                    <SelectItem value="30" className="font-light">30 ימים</SelectItem>
-                  </SelectContent>
-                </Select>
-              </CardContent>
-            </Card>
+            </div>
           )}
+        </section>
 
-          {/* Check Button */}
-          <Button 
-            onClick={checkAppointments} 
+        {/* Notification Form */}
+        <section className="w-full bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+          <h2 className="text-base font-semibold text-gray-700 dark:text-gray-200 mb-2 mt-2 text-right w-full">קבל התראה על תור פנוי</h2>
+          <form className="flex flex-col gap-2" onSubmit={handleNotifySubmit}>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-200">אימייל</label>
+            <input
+              type="email"
+              name="email"
+              value={notifyEmail}
+              onChange={e => setNotifyEmail(e.target.value)}
+              placeholder="האימייל שלך"
+              className="w-full rounded border px-3 py-2 text-sm bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700"
+              required
+              autoComplete="email"
+            />
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mt-2">סוג התראה</label>
+            <div className="flex gap-2 mb-1">
+              <button type="button" className={`flex-1 rounded py-2 text-sm font-medium border ${notifyType === 'single' ? 'bg-emerald-100 dark:bg-emerald-900/40 border-emerald-400 text-emerald-700 dark:text-emerald-200' : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300'}`} onClick={() => setNotifyType('single')}>יום בודד</button>
+              <button type="button" className={`flex-1 rounded py-2 text-sm font-medium border ${notifyType === 'range' ? 'bg-emerald-100 dark:bg-emerald-900/40 border-emerald-400 text-emerald-700 dark:text-emerald-200' : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300'}`} onClick={() => setNotifyType('range')}>טווח תאריכים</button>
+            </div>
+            {notifyType === 'single' ? (
+              <input
+                type="date"
+                name="date"
+                value={typeof notifyDate === 'string' ? notifyDate : ''}
+                onChange={e => setNotifyDate(e.target.value)}
+                className="w-full rounded border px-3 py-2 text-sm bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700"
+                required
+              />
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  type="date"
+                  name="start"
+                  value={typeof notifyDate === 'object' ? notifyDate.start : ''}
+                  onChange={e => setNotifyDate(prev => (typeof prev === 'object' ? { ...prev, start: e.target.value } : { start: e.target.value, end: '' }))}
+                  className="w-full rounded border px-3 py-2 text-sm bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700"
+                  required
+                />
+                <input
+                  type="date"
+                  name="end"
+                  value={typeof notifyDate === 'object' ? notifyDate.end : ''}
+                  onChange={e => setNotifyDate(prev => (typeof prev === 'object' ? { ...prev, end: e.target.value } : { start: '', end: e.target.value }))}
+                  className="w-full rounded border px-3 py-2 text-sm bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700"
+                  required
+                />
+              </div>
+            )}
+            <button
+              type="submit"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded py-2 text-sm font-medium mt-2 disabled:opacity-60 transition"
+              disabled={notifyLoading}
+            >
+              {notifyLoading ? 'נרשם...' : 'התראה על תור'}
+            </button>
+            {notifyStatus && (
+              <div className="text-xs text-center mt-1 text-gray-500">{notifyStatus}</div>
+            )}
+          </form>
+        </section>
+
+        {/* Search Controls */}
+        <section className="w-full flex flex-col gap-4 mb-8">
+          <h2 className="text-base font-semibold text-gray-700 dark:text-gray-200 mb-2 mt-2 text-right w-full">אפשרויות חיפוש</h2>
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 flex flex-col gap-2">
+            <div className="flex gap-2">
+              <Button
+                variant={searchMode === 'closest' ? 'default' : 'outline'}
+                onClick={() => setSearchMode('closest')}
+                className="flex-1 rounded-lg"
+              >
+                הקרוב ביותר
+              </Button>
+              <Button
+                variant={searchMode === 'range' ? 'default' : 'outline'}
+                onClick={() => setSearchMode('range')}
+                className="flex-1 rounded-lg"
+              >
+                טווח ימים
+              </Button>
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 text-center mt-1">
+              {searchMode === 'range' 
+                ? `בדיקת ${days} ימים קדימה (ללא ימי שני ושבת)`
+                : 'חיפוש התור הפנוי הקרוב ביותר (עד 30 ימים)'}
+            </div>
+            {searchMode === 'range' && (
+              <Select value={days.toString()} onValueChange={value => setDays(parseInt(value))}>
+                <SelectTrigger className="mt-2">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="3">3 ימים</SelectItem>
+                  <SelectItem value="7">7 ימים</SelectItem>
+                  <SelectItem value="14">14 ימים</SelectItem>
+                  <SelectItem value="21">21 ימים</SelectItem>
+                  <SelectItem value="30">30 ימים</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+          <Button
+            onClick={checkAppointments}
             disabled={loading}
-            className="w-full h-12 text-lg font-normal"
+            className="w-full h-12 text-lg font-semibold rounded-xl bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 shadow-md transition"
           >
             {loading ? (
               <div className="flex items-center gap-2">
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                <span className="font-light">
-                  {searchMode === 'closest' ? 'מחפש תור קרוב...' : 'בודק תורים...'}
-                </span>
+                <span>{searchMode === 'closest' ? 'מחפש תור...' : 'בודק תורים...'}</span>
               </div>
             ) : (
               <div className="flex items-center gap-2">
                 <Search className="h-5 w-5" />
-                <span className="font-light">
-                  {searchMode === 'closest' ? 'חפש תור קרוב' : 'בדוק תורים'}
-                </span>
+                <span>{searchMode === 'closest' ? 'חפש תור קרוב' : 'בדוק תורים'}</span>
               </div>
             )}
           </Button>
-
-          {/* Offline Alert */}
-          {!isOnline && (
-            <Alert className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-900/20 font-hebrew">
-              <WifiOff className="h-4 w-4 text-orange-600" />
-              <AlertDescription className="font-light">
-                אין חיבור לאינטרנט. התוצאות המוצגות עשויות להיות לא עדכניות.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {/* Results */}
-          {results.length > 0 && (
-            <div className="space-y-4 font-hebrew">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-normal">תוצאות</h2>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleShare}
-                  className="font-light"
-                >
-                  <Share2 className="h-4 w-4 ml-1" />
-                  שתף
-                </Button>
-              </div>
-
-              <div className="space-y-3">
-                {results.map((result, index) => {
-                  const dayName = getDayNameHebrew(result.date)
-                  const isClosed = isClosedDay(result.date)
-                  
-                  return (
-                    <Card key={index} className={`font-hebrew ${
-                      result.available === true 
-                        ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20'
-                        : result.available === false
-                        ? 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20'
-                        : 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/20'
-                    }`}>
-                      <CardContent className="p-4">
-                        <div className="flex justify-between items-start mb-2">
-                          <div className="flex-1">
-                            <div className="font-normal text-lg">
-                              {formatDisplayDateIsrael(result.date)}
-                            </div>
-                            <div className="text-sm text-gray-600 dark:text-gray-400 font-light">
-                              {dayName}
-                              {isClosed && (
-                                <Badge variant="secondary" className="mr-2 font-light">
-                                  סגור
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                          
-                          <div className="flex items-center gap-2">
-                            <Badge 
-                              variant={
-                                result.available === true ? "default" :
-                                result.available === false ? "destructive" : "secondary"
-                              }
-                              className="font-light"
-                            >
-                              {result.available === true ? 'פנוי' :
-                               result.available === false ? 'תפוס' : 'לא ידוע'}
-                            </Badge>
-                            
-                            {result.available === true && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => window.open(generateBookingUrl(result.date), '_blank')}
-                                className="font-light h-8 px-3"
-                              >
-                                <ExternalLink className="h-4 w-4 ml-1" />
-                                קבע תור
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-
-                        {result.times && result.times.length > 0 && (
-                          <div className="space-y-2">
-                            <Separator />
-                            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 font-light">
-                              <Clock className="h-4 w-4" />
-                              זמנים פנויים:
-                            </div>
-                            <div className="flex flex-wrap gap-1">
-                              {result.times.map((time, timeIndex) => (
-                                <Badge key={timeIndex} variant="outline" className="time-display font-light">
-                                  {formatTimeIsrael(time)}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {result.message && (
-                          <div className="mt-2 text-sm text-gray-600 dark:text-gray-400 font-light">
-                            {result.message}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Notification Form */}
-          <div className="mt-6">
-            <form
-              className="flex flex-col gap-2 items-center max-w-xs mx-auto"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                setNotifyStatus(null);
-                const form = e.target as HTMLFormElement;
-                const email = (form.email as HTMLInputElement).value;
-                const date = (form.date as HTMLInputElement).value;
-                if (!email || !date) {
-                  setNotifyStatus('נא למלא אימייל ותאריך');
-                  return;
-                }
-                setNotifyLoading(true);
-                try {
-                  const res = await fetch('/api/notify-request', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, date }),
-                  });
-                  const data = await res.json();
-                  if (data.success) {
-                    setNotifyStatus('נרשמת בהצלחה! תקבל התראה אם יימצא תור.');
-                  } else {
-                    setNotifyStatus(data.error || 'שגיאה בהרשמה');
-                  }
-                } catch (err) {
-                  setNotifyStatus('שגיאה בהרשמה');
-                } finally {
-                  setNotifyLoading(false);
-                }
-              }}
-            >
-              <input
-                type="email"
-                name="email"
-                placeholder="האימייל שלך"
-                className="w-full rounded border px-3 py-2 text-sm"
-                required
-                autoComplete="email"
-              />
-              <input
-                type="date"
-                name="date"
-                className="w-full rounded border px-3 py-2 text-sm"
-                required
-              />
-              <button
-                type="submit"
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded py-2 text-sm font-medium mt-1 disabled:opacity-60"
-                disabled={notifyLoading}
-              >
-                {notifyLoading ? 'נרשם...' : 'התראה על תור בתאריך זה'}
-              </button>
-              {notifyStatus && (
-                <div className="text-xs text-center mt-1 text-gray-500">{notifyStatus}</div>
-              )}
-            </form>
-          </div>
-        </div>
+        </section>
       </div>
-    </>
+    </div>
   )
 } 
