@@ -44,14 +44,16 @@ const withPWA = require('next-pwa')({
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // API routes configuration is handled automatically by Next.js
-  // Server Actions are enabled by default in Next.js 14+
   
-  // Remove standalone output for Netlify - it interferes with Functions
-  // output: 'export', // Don't use export either as it disables API routes
+  // Remove experimental runtime config that's causing issues
   
   // Ensure trailing slash consistency
   trailingSlash: false,
+  
+  // Optimize for Netlify deployment
+  env: {
+    NETLIFY_NEXT_PLUGIN_SKIP: 'false',
+  },
 }
 
 module.exports = withPWA(nextConfig); 

@@ -9,16 +9,21 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-# Scheduled function to run auto-check every 5 minutes
 [functions]
-  # (Optional) global config here
+  # Global function configuration
 
+# Scheduled function to run auto-check every 5 minutes
 [functions."scheduled-check"]
   schedule = "*/5 * * * *" # every 5 minutes
+  timeout = 900  # 15 minutes maximum
 
-# Background function configuration
-[functions."auto-check-background"]
-  timeout = 900
+# Auto-check function configuration
+[functions."auto-check"]
+  timeout = 900  # 15 minutes maximum
+
+# Get cached result function
+[functions."get-cached-result"]
+  timeout = 30   # 30 seconds (fast response)
 
 # Environment variables needed for deployment
 # Set these in Netlify dashboard:

@@ -8,7 +8,16 @@
     "start": "next start",
     "lint": "next lint",
     "generate:icons": "node scripts/generate-icons.js",
-    "pwa:build": "npm run generate:icons && npm run build"
+    "pwa:build": "npm run generate:icons && npm run build",
+    "test:functions": "node test-functions.js",
+    "dev:netlify": "netlify dev",
+    "deploy:test": "netlify deploy",
+    "deploy:prod": "netlify deploy --prod",
+    "debug:prod": "node debug-production.js",
+    "debug:cache": "node debug-production.js cache",
+    "debug:trigger": "node debug-production.js trigger",
+    "debug:health": "node debug-production.js health",
+    "test:improvements": "node test-improvements.js"
   },
   "dependencies": {
     "@netlify/functions": "^4.1.6",
@@ -25,7 +34,7 @@
     "clsx": "^2.1.1",
     "fflate": "^0.8.1",
     "lucide-react": "^0.522.0",
-    "next": "14.0.4",
+    "next": "14.2.30",
     "next-pwa": "^5.6.0",
     "pako": "^2.1.0",
     "react": "^18",
@@ -36,10 +45,10 @@
     "workbox-webpack-plugin": "^7.3.0"
   },
   "devDependencies": {
-    "@netlify/plugin-nextjs": "^4.41.3",
+    "@netlify/plugin-nextjs": "^5.11.3",
     "autoprefixer": "^10.0.1",
     "eslint": "^8",
-    "eslint-config-next": "14.0.4",
+    "eslint-config-next": "14.2.30",
     "postcss": "^8",
     "tailwindcss": "^3.3.0"
   }

@@ -302,22 +302,43 @@ export default function Home() {
   useEffect(() => {
     const loadCachedResults = async () => {
       try {
+        console.log('Loading cached auto-check results...')
         const response = await fetch('/.netlify/functions/get-cached-result')
         if (response.ok) {
           const data = await response.json()
+          console.log('Cached data received:', data)
+          
+          // Check if we have cached auto-check results
           if (data.cached && data.summary?.found) {
             setCachedResult(data)
-            console.log('Loaded cached appointment result:', data)
+            console.log('✅ Auto-check result loaded:', {
+              found: data.summary.found,
+              date: data.summary.date,
+              times: data.summary.times,
+              lastCheck: data.lastCheck,
+              cacheAge: data.cacheAge
+            })
+          } else if (data.cached) {
+            console.log('ℹ️ Cache exists but no appointments found')
+            setCachedResult(null)
+          } else {
+            console.log('ℹ️ No cached results available')
           }
+        } else {
+          console.log('❌ Failed to load cached results:', response.status)
         }
       } catch (error) {
-        console.error('Error loading cached results:', error)
+        console.error('❌ Error loading cached results:', error)
       } finally {
         setLoadingCached(false)
       }
     }
 
     loadCachedResults()
+    
+    // Refresh cached results every 2 minutes
+    const interval = setInterval(loadCachedResults, 2 * 60 * 1000)
+    return () => clearInterval(interval)
   }, [])
 
   const checkAppointments = async () => {
@@ -457,50 +478,94 @@ ${availableResults.length} תאריכים זמינים
           </div>
 
           {/* Auto-Check Results */}
-          {!loadingCached && cachedResult && (
-            <Card className="font-hebrew border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg font-normal flex items-center gap-2 text-green-800 dark:text-green-200">
-                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                  תור קרוב נמצא אוטומטית
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="text-center">
-                  <div className="text-2xl font-light text-green-900 dark:text-green-100">
-                    {formatDisplayDateIsrael(cachedResult.summary.date)}
-                  </div>
-                  <div className="text-sm text-green-700 dark:text-green-300">
-                    {getDayNameHebrew(cachedResult.summary.date)}
-                  </div>
-                </div>
-                
-                <div className="flex flex-wrap gap-2 justify-center">
-                  {cachedResult.summary.times?.map((time: string, index: number) => (
-                    <Badge key={index} variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
-                      {formatTimeIsrael(time)}
-                    </Badge>
-                  ))}
-                </div>
-                
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => window.open(generateBookingUrl(cachedResult.summary.date), '_blank')}
-                    className="flex-1 bg-green-600 hover:bg-green-700 text-white font-light"
-                  >
-                    קבע תור
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleShare}
-                    className="border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-300"
-                  >
-                    <Share2 className="h-4 w-4" />
-                  </Button>
-                </div>
-                
-                <div className="text-xs text-green-600 dark:text-green-400 text-center">
-                  בדיקה אוטומטית מ-{cachedResult.lastCheck} ({cachedResult.cacheAge} דקות)
+          {!loadingCached && (
+            <>
+              {cachedResult && cachedResult.summary?.found ? (
+                <Card className="font-hebrew border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg font-normal flex items-center gap-2 text-green-800 dark:text-green-200">
+                      <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                      🎉 תור קרוב נמצא אוטומטית!
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="text-center">
+                      <div className="text-2xl font-light text-green-900 dark:text-green-100">
+                        {formatDisplayDateIsrael(cachedResult.summary.date)}
+                      </div>
+                      <div className="text-sm text-green-700 dark:text-green-300">
+                        {getDayNameHebrew(cachedResult.summary.date)}
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-2 justify-center">
+                      {cachedResult.summary.times?.map((time: string, index: number) => (
+                        <Badge key={index} variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
+                          {formatTimeIsrael(time)}
+                        </Badge>
+                      ))}
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => window.open(generateBookingUrl(cachedResult.summary.date), '_blank')}
+                        className="flex-1 bg-green-600 hover:bg-green-700 text-white font-light"
+                      >
+                        🎯 קבע תור עכשיו
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={handleShare}
+                        className="border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-300"
+                      >
+                        <Share2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    
+                    <div className="text-xs text-green-600 dark:text-green-400 text-center">
+                      📅 בדיקה אוטומטית מ-{cachedResult.lastCheck} ({cachedResult.cacheAge} דקות)
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="font-hebrew border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg font-normal flex items-center gap-2 text-blue-800 dark:text-blue-200">
+                      <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+                      🔍 בדיקה אוטומטית פעילה
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="text-center">
+                      <div className="text-lg font-light text-blue-900 dark:text-blue-100">
+                        לא נמצאו תורים פנויים כרגע
+                      </div>
+                      <div className="text-sm text-blue-700 dark:text-blue-300">
+                        המערכת בודקת כל 5 דקות אוטומטית
+                      </div>
+                    </div>
+                    
+                    {cachedResult && (
+                      <div className="text-xs text-blue-600 dark:text-blue-400 text-center">
+                        📅 בדיקה אחרונה: {cachedResult.lastCheck} ({cachedResult.cacheAge} דקות)
+                        <br />
+                        🔢 נבדקו {cachedResult.summary?.totalChecked || 30} ימים
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          )}
+          
+          {loadingCached && (
+            <Card className="font-hebrew border-gray-200 bg-gray-50 dark:bg-gray-800/20 dark:border-gray-700">
+              <CardContent className="p-4 text-center">
+                <div className="flex items-center justify-center gap-2">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                  <span className="text-gray-600 dark:text-gray-400 font-light">
+                    טוען תוצאות אוטומטיות...
+                  </span>
                 </div>
               </CardContent>
             </Card>
