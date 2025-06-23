@@ -135,7 +135,6 @@ export default function Home() {
                                (window.navigator as any).standalone ||
                                document.referrer.includes('android-app://');
       setIsStandalone(isStandaloneMode)
-      console.log('PWA Debug: Standalone mode:', isStandaloneMode)
       return isStandaloneMode
     }
 
@@ -143,7 +142,6 @@ export default function Home() {
     const checkPWAInstallability = () => {
       // Don't show banner if already installed
       if (checkStandalone()) {
-        console.log('PWA Debug: App already installed, hiding banner')
         return
       }
 
@@ -153,36 +151,30 @@ export default function Home() {
         const dismissedTime = parseInt(dismissed)
         const oneDay = 24 * 60 * 60 * 1000 // 24 hours
         if (Date.now() - dismissedTime < oneDay) {
-          console.log('PWA Debug: Banner recently dismissed, not checking installability')
           return
         }
       }
 
       // Check if service worker is supported
       if (!('serviceWorker' in navigator)) {
-        console.log('PWA Debug: Service Worker not supported')
         return
       }
 
       // Check if we're on HTTPS or localhost
       const isSecure = location.protocol === 'https:' || location.hostname === 'localhost'
-      console.log('PWA Debug: Secure context:', isSecure)
 
       // For development/testing, show banner after a delay if no beforeinstallprompt
       if (process.env.NODE_ENV === 'development' || !isSecure) {
-        console.log('PWA Debug: Development mode or insecure context - checking for test banner')
         setTimeout(() => {
           // Double-check dismissal state before showing
           const stillDismissed = localStorage.getItem('pwa-banner-dismissed')
           if (stillDismissed) {
-            console.log('PWA Debug: Banner still dismissed, not showing test banner')
             return
           }
           
           if (!installPrompt && !isStandalone) {
             setCanInstall(true)
             setShowPWABanner(true)
-            console.log('PWA Debug: Showing test banner (no beforeinstallprompt received)')
           }
         }, 3000) // Show after 3 seconds if no event received
       }
@@ -190,7 +182,6 @@ export default function Home() {
 
     // Handle PWA install prompt
     const handleBeforeInstallPrompt = (e: any) => {
-      console.log('PWA Debug: beforeinstallprompt event received')
       e.preventDefault()
       setInstallPrompt(e)
       setCanInstall(true)
@@ -198,7 +189,6 @@ export default function Home() {
     }
 
     const handleAppInstalled = () => {
-      console.log('PWA Debug: App installed successfully')
       setCanInstall(false)
       setInstallPrompt(null)
       setShowPWABanner(false)
@@ -215,7 +205,6 @@ export default function Home() {
     // Listen for display mode changes
     const mediaQuery = window.matchMedia('(display-mode: standalone)')
     const handleDisplayModeChange = (e: MediaQueryListEvent) => {
-      console.log('PWA Debug: Display mode changed:', e.matches)
       setIsStandalone(e.matches)
       if (e.matches) {
         setShowPWABanner(false)
@@ -235,10 +224,7 @@ export default function Home() {
   }, [])
 
   const handleInstall = async () => {
-    console.log('PWA Debug: Install button clicked')
-    
     if (!installPrompt) {
-      console.log('PWA Debug: No install prompt available - this might be a test banner')
       // For testing purposes, simulate installation
       if (process.env.NODE_ENV === 'development') {
         setCanInstall(false)
@@ -250,10 +236,8 @@ export default function Home() {
     }
 
     try {
-      console.log('PWA Debug: Prompting user for installation')
       installPrompt.prompt()
       const { outcome } = await installPrompt.userChoice
-      console.log('PWA Debug: User choice:', outcome)
       
       if (outcome === 'accepted') {
         setCanInstall(false)
@@ -262,21 +246,17 @@ export default function Home() {
       
       setInstallPrompt(null)
     } catch (error) {
-      console.error('PWA Debug: Error during installation:', error)
+      console.error('Error during PWA installation:', error)
     }
   }
 
   const handleDismissPWABanner = () => {
-    console.log('PWA Debug: Banner dismissed')
-    
     // Immediately hide banner and store dismissal
     setShowPWABanner(false)
     setCanInstall(false) // Also set canInstall to false to prevent re-showing
     
     // Store dismissal in localStorage to prevent showing again for a while
     localStorage.setItem('pwa-banner-dismissed', Date.now().toString())
-    
-    console.log('PWA Debug: Banner state after dismiss - showBanner:', false, 'canInstall:', false)
   }
 
   // Check if banner was recently dismissed (run once on mount)
@@ -286,14 +266,12 @@ export default function Home() {
       const dismissedTime = parseInt(dismissed)
       const oneDay = 24 * 60 * 60 * 1000 // 24 hours
       if (Date.now() - dismissedTime < oneDay) {
-        console.log('PWA Debug: Banner was recently dismissed, preventing show')
         setShowPWABanner(false)
         setCanInstall(false)
         return
       } else {
         // Clean up old dismissal
         localStorage.removeItem('pwa-banner-dismissed')
-        console.log('PWA Debug: Old dismissal expired, removed from storage')
       }
     }
   }, [])
@@ -302,41 +280,25 @@ export default function Home() {
   useEffect(() => {
     const loadCachedResults = async () => {
       try {
-        console.log('Loading cached auto-check results...')
         const response = await fetch('/.netlify/functions/get-cached-result')
         if (response.ok) {
           const data = await response.json()
-          console.log('Cached data received:', data)
           
           // Check if we have cached auto-check results
           if (data.cached && data.summary?.found) {
             setCachedResult(data)
-            console.log('✅ Auto-check result loaded:', {
-              found: data.summary.found,
-              date: data.summary.date,
-              times: data.summary.times,
-              lastCheck: data.lastCheck,
-              cacheAge: data.cacheAge
-            })
           } else if (data.cached) {
-            console.log('ℹ️ Cache exists but no appointments found')
             setCachedResult(null)
-          } else {
-            console.log('ℹ️ No cached results available')
           }
-        } else {
-          console.log('❌ Failed to load cached results:', response.status)
         }
       } catch (error) {
-        console.error('❌ Error loading cached results:', error)
-      } finally {
-        setLoadingCached(false)
+        console.error('Failed to load cached results:', error)
       }
     }
 
     loadCachedResults()
-    
-    // Refresh cached results every 2 minutes
+
+    // Set up interval to refresh cached results every 2 minutes
     const interval = setInterval(loadCachedResults, 2 * 60 * 1000)
     return () => clearInterval(interval)
   }, [])

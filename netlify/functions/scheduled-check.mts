@@ -1,8 +1,6 @@
 import type { Context } from '@netlify/functions'
 
 export default async (req: Request, context: Context) => {
-  console.log('Scheduled check triggered at:', new Date().toISOString())
-  
   try {
     // Get the site URL from environment
     const siteUrl = Netlify.env.get('URL') || 'https://your-site.netlify.app'
@@ -11,7 +9,7 @@ export default async (req: Request, context: Context) => {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 10 * 60 * 1000) // 10 minute timeout
     
-    // Trigger the auto-check function (GET request, not POST)
+    // Trigger the auto-check function
     const response = await fetch(`${siteUrl}/.netlify/functions/auto-check`, {
       method: 'GET',
       signal: controller.signal
@@ -24,8 +22,8 @@ export default async (req: Request, context: Context) => {
     if (response.ok) {
       if (result.skipped) {
         console.log('Scheduled auto-check skipped (already running or locked)')
-      } else {
-        console.log('Scheduled auto-check completed successfully:', result.result?.summary)
+      } else if (result.result?.summary?.found) {
+        console.log(`Scheduled check: Found appointment on ${result.result.summary.date}`)
       }
       
       return new Response(JSON.stringify({
@@ -39,7 +37,6 @@ export default async (req: Request, context: Context) => {
         }
       })
     } else if (response.status === 429) {
-      console.log('Scheduled auto-check rate limited - this is normal')
       return new Response(JSON.stringify({
         success: true,
         message: 'Rate limited (normal)',

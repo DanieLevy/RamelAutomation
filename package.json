@@ -9,15 +9,9 @@
     "lint": "next lint",
     "generate:icons": "node scripts/generate-icons.js",
     "pwa:build": "npm run generate:icons && npm run build",
-    "test:functions": "node test-functions.js",
     "dev:netlify": "netlify dev",
     "deploy:test": "netlify deploy",
-    "deploy:prod": "netlify deploy --prod",
-    "debug:prod": "node debug-production.js",
-    "debug:cache": "node debug-production.js cache",
-    "debug:trigger": "node debug-production.js trigger",
-    "debug:health": "node debug-production.js health",
-    "test:improvements": "node test-improvements.js"
+    "deploy:prod": "netlify deploy --prod"
   },
   "dependencies": {
     "@netlify/functions": "^4.1.6",

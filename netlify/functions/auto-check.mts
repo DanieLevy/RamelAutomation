@@ -177,11 +177,8 @@ async function checkSingleDate(dateStr: string): Promise<any> {
 
 async function findClosestAppointment(): Promise<any> {
   const currentDate = getCurrentDateIsrael()
-  // Use 30 days in both dev and production to properly test appointment detection
   const maxDays = 30
   const openDates = getOpenDays(currentDate, maxDays)
-  
-  console.log(`Auto-check: Searching for closest appointment in ${openDates.length} open days`)
   
   let checkedCount = 0
   
@@ -189,12 +186,11 @@ async function findClosestAppointment(): Promise<any> {
   for (const date of openDates) {
     checkedCount++
     const dateStr = formatDateIsrael(date)
-    console.log(`Auto-check: Checking ${dateStr} (${checkedCount}/${openDates.length})`)
     
     const result = await checkSingleDate(dateStr)
     
     if (result.available === true && result.times.length > 0) {
-      console.log(`Auto-check: ✅ FOUND closest appointment on ${dateStr} - STOPPING search`)
+      console.log(`Found appointment on ${dateStr} after checking ${checkedCount} days`)
       return {
         results: [result],
         summary: {
@@ -223,15 +219,14 @@ async function findClosestAppointment(): Promise<any> {
         }
       }
       writeCacheToFile(progressData)
-      console.log(`Auto-check: Progress saved - ${checkedCount}/${openDates.length} checked`)
     }
     
-    // Add delay between requests to be respectful and avoid rate limiting (reduced for dev)
+    // Add delay between requests to be respectful and avoid rate limiting
     const delay = process.env.NETLIFY_DEV ? 300 : 1000 // 300ms for dev, 1000ms for prod
     await new Promise(resolve => setTimeout(resolve, delay))
   }
   
-  console.log(`Auto-check: ❌ No appointments found after checking ${checkedCount} days`)
+  console.log(`No appointments found after checking ${checkedCount} days`)
   return {
     results: [],
     summary: {
@@ -243,12 +238,9 @@ async function findClosestAppointment(): Promise<any> {
   }
 }
 
-// Modern Netlify Functions handler (NOT background - regular function)
+// Modern Netlify Functions handler
 export default async (req: Request, context: Context) => {
-  console.log('Auto-check function started - NO LOCKS')
-  
   try {
-    // Just run the function without internal timeout
     const result = await findClosestAppointment()
     
     // Store result with timestamp
@@ -259,13 +251,6 @@ export default async (req: Request, context: Context) => {
     
     // Write to file cache
     writeCacheToFile(cacheData)
-    
-    console.log('Auto-check completed successfully:', {
-      found: result.summary.found,
-      date: result.summary.date,
-      totalChecked: result.summary.totalChecked,
-      timestamp: new Date().toISOString()
-    })
     
     return new Response(JSON.stringify({
       success: true,
@@ -290,7 +275,5 @@ export default async (req: Request, context: Context) => {
         'Access-Control-Allow-Origin': '*'
       }
     })
-  } finally {
-    console.log('Auto-check function completed')
   }
 } 

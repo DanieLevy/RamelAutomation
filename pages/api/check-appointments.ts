@@ -260,9 +260,6 @@ export default async function handler(
     // Use Israel timezone for date operations
     const baseDate = startDate ? new Date(startDate + 'T00:00:00') : getCurrentDateIsrael();
     
-    // Ensure we're working with Israel timezone
-    console.log(`Starting check from Israel date: ${formatDateForUrl(baseDate)}`);
-
     let datesToCheck: Date[];
     
     if (mode === 'closest') {
@@ -273,8 +270,6 @@ export default async function handler(
       const maxDays = Math.min(days, 30); // Limit to 30 days maximum
       datesToCheck = getOpenDays(baseDate, maxDays);
     }
-
-    console.log(`Checking ${datesToCheck.length} open days (skipping Mondays and Saturdays)`);
 
     // Check cache first
     const cacheKey = `${datesToCheck.length}-${mode}`;
