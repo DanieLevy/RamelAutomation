@@ -1,6 +1,7 @@
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { ThemeToggle } from '../components/ui/theme-toggle';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,13 +25,6 @@ export default function UnsubscribePage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<NotificationData | null>(null);
   const [status, setStatus] = useState<'loading' | 'not_found' | 'already_cancelled' | 'expired' | 'max_reached' | 'success' | 'error'>('loading');
-  const [darkMode, setDarkMode] = useState(false);
-
-  useEffect(() => {
-    // Check for dark mode preference
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    setDarkMode(prefersDark);
-  }, []);
 
   useEffect(() => {
     if (!token || typeof token !== 'string') {
@@ -120,18 +114,18 @@ export default function UnsubscribePage() {
     return new Date(dateString).toLocaleDateString('he-IL');
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusInfo = (status: string) => {
     switch (status) {
       case 'active':
-        return <span className="status-badge status-active">פעיל</span>;
+        return { text: 'פעיל', color: 'emerald', icon: '●' };
       case 'cancelled':
-        return <span className="status-badge status-cancelled">בוטל על ידי המשתמש</span>;
+        return { text: 'בוטל', color: 'red', icon: '⊘' };
       case 'expired':
-        return <span className="status-badge status-expired">פג תוקף</span>;
+        return { text: 'פג תוקף', color: 'amber', icon: '⏰' };
       case 'max_reached':
-        return <span className="status-badge status-max">הושלמו 6 התראות</span>;
+        return { text: 'הושלם', color: 'blue', icon: '✓' };
       default:
-        return null;
+        return { text: 'לא ידוע', color: 'gray', icon: '?' };
     }
   };
 
@@ -139,8 +133,8 @@ export default function UnsubscribePage() {
     switch (status) {
       case 'success':
         return (
-          <div className="icon success">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="flex items-center justify-center w-16 h-16 mx-auto mb-6 bg-emerald-100 dark:bg-emerald-900/20 rounded-full">
+            <svg className="w-8 h-8 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
@@ -148,8 +142,8 @@ export default function UnsubscribePage() {
       case 'not_found':
       case 'error':
         return (
-          <div className="icon error">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="flex items-center justify-center w-16 h-16 mx-auto mb-6 bg-red-100 dark:bg-red-900/20 rounded-full">
+            <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </div>
@@ -158,18 +152,16 @@ export default function UnsubscribePage() {
       case 'expired':
       case 'max_reached':
         return (
-          <div className="icon warning">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <div className="flex items-center justify-center w-16 h-16 mx-auto mb-6 bg-amber-100 dark:bg-amber-900/20 rounded-full">
+            <svg className="w-8 h-8 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
             </svg>
           </div>
         );
       default:
         return (
-          <div className="icon info">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+          <div className="flex items-center justify-center w-16 h-16 mx-auto mb-6 bg-blue-100 dark:bg-blue-900/20 rounded-full">
+            <div className="w-6 h-6 border-2 border-blue-600 dark:border-blue-400 border-t-transparent rounded-full animate-spin"></div>
           </div>
         );
     }
@@ -178,14 +170,14 @@ export default function UnsubscribePage() {
   const renderContent = () => {
     if (loading) {
       return (
-        <div className="card animation">
-          <div className="icon info">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          </div>
-          <h1>מעבד בקשה...</h1>
-          <p>אנא המתן בזמן שאנו מעבדים את בקשת הביטול שלך.</p>
+        <div className="animate-fade-in">
+          {getIcon()}
+          <h1 className="text-2xl font-light text-center mb-4 text-foreground">
+            מעבד בקשה...
+          </h1>
+          <p className="text-muted-foreground text-center mb-8 leading-relaxed">
+            אנא המתן בזמן שאנו מעבדים את בקשת הביטול שלך
+          </p>
         </div>
       );
     }
@@ -193,149 +185,325 @@ export default function UnsubscribePage() {
     switch (status) {
       case 'success':
         return (
-          <div className="card animation">
-            {data && getStatusBadge('cancelled')}
+          <div className="animate-fade-in">
             {getIcon()}
-            <h1>הרשמה בוטלה בהצלחה!</h1>
-            <p>ההרשמה שלך להתראות במספרת רם-אל בוטלה בהצלחה. לא תקבל עוד התראות על הכתובת הזו.</p>
+            <h1 className="text-3xl font-light text-center mb-4 text-foreground">
+              הרשמה בוטלה בהצלחה
+            </h1>
+            <p className="text-muted-foreground text-center mb-8 leading-relaxed">
+              ההרשמה שלך להתראות במספרת רם-אל בוטלה בהצלחה.<br />
+              לא תקבל עוד התראות על הכתובת הזו.
+            </p>
             
             {data && (
-              <div className="details-box">
-                <p><strong>פרטי ההרשמה שבוטלה:</strong></p>
-                <p>📧 כתובת מייל: {data.email}</p>
-                <p>📅 {formatCriteria(data.criteria_type, data.criteria)}</p>
-                <p>📊 התראות שנשלחו: {data.notification_count} מתוך 6</p>
-                <p>📆 נוצר ב: {formatDate(data.created_at)}</p>
-                <p>📨 התראה אחרונה: {data.last_notified ? formatDate(data.last_notified) : 'אף פעם'}</p>
-                <p>🚫 בוטל היום: {new Date().toLocaleDateString('he-IL')}</p>
+              <div className="bg-muted/50 rounded-xl p-6 mb-8 border border-border">
+                <h3 className="text-sm font-medium text-muted-foreground mb-4 text-center">
+                  פרטי ההרשמה שבוטלה
+                </h3>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">כתובת מייל</span>
+                    <span className="font-medium">{data.email}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">קריטריונים</span>
+                    <span className="font-medium">{formatCriteria(data.criteria_type, data.criteria)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">התראות שנשלחו</span>
+                    <span className="font-medium">{data.notification_count} מתוך 6</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">נוצר ב</span>
+                    <span className="font-medium">{formatDate(data.created_at)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">התראה אחרונה</span>
+                    <span className="font-medium">{data.last_notified ? formatDate(data.last_notified) : 'אף פעם'}</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-border">
+                    <span className="text-muted-foreground">סטטוס</span>
+                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-md text-xs font-medium">
+                      ⊘ בוטל
+                    </span>
+                  </div>
+                </div>
               </div>
             )}
             
-            <p>תוכל לחזור ולהירשם להתראות בכל עת דרך האפליקציה.</p>
-            <div>
-              <button onClick={() => router.push('/')} className="button">רישום מחדש</button>
-              <button onClick={() => router.push('/')} className="button secondary">חזרה לאפליקציה</button>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button 
+                onClick={() => router.push('/')} 
+                className="px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
+              >
+                רישום מחדש
+              </button>
+              <button 
+                onClick={() => router.push('/')} 
+                className="px-6 py-3 bg-secondary text-secondary-foreground rounded-lg font-medium hover:bg-secondary/80 transition-colors"
+              >
+                חזרה לאפליקציה
+              </button>
             </div>
           </div>
         );
 
       case 'already_cancelled':
+        const statusInfo = getStatusInfo('cancelled');
         return (
-          <div className="card animation">
-            {data && getStatusBadge('cancelled')}
+          <div className="animate-fade-in">
             {getIcon()}
-            <h1>ההרשמה כבר בוטלה</h1>
-            <p>ההרשמה שלך להתראות במספרת רם-אל כבר בוטלה בעבר על ידך.</p>
+            <h1 className="text-3xl font-light text-center mb-4 text-foreground">
+              ההרשמה כבר בוטלה
+            </h1>
+            <p className="text-muted-foreground text-center mb-8 leading-relaxed">
+              ההרשמה שלך להתראות במספרת רם-אל כבר בוטלה בעבר על ידך.
+            </p>
             
             {data && (
-              <div className="details-box">
-                <p><strong>פרטי ההרשמה:</strong></p>
-                <p>📧 כתובת מייל: {data.email}</p>
-                <p>📅 {formatCriteria(data.criteria_type, data.criteria)}</p>
-                <p>📊 התראות שנשלחו: {data.notification_count} מתוך 6</p>
-                <p>📆 נוצר ב: {formatDate(data.created_at)}</p>
-                <p>📨 התראה אחרונה: {data.last_notified ? formatDate(data.last_notified) : 'אף פעם'}</p>
+              <div className="bg-muted/50 rounded-xl p-6 mb-8 border border-border">
+                <h3 className="text-sm font-medium text-muted-foreground mb-4 text-center">
+                  פרטי ההרשמה
+                </h3>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">כתובת מייל</span>
+                    <span className="font-medium">{data.email}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">קריטריונים</span>
+                    <span className="font-medium">{formatCriteria(data.criteria_type, data.criteria)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">התראות שנשלחו</span>
+                    <span className="font-medium">{data.notification_count} מתוך 6</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-border">
+                    <span className="text-muted-foreground">סטטוס</span>
+                    <span className={`inline-flex items-center gap-1 px-2 py-1 bg-${statusInfo.color}-100 dark:bg-${statusInfo.color}-900/20 text-${statusInfo.color}-700 dark:text-${statusInfo.color}-300 rounded-md text-xs font-medium`}>
+                      {statusInfo.icon} {statusInfo.text}
+                    </span>
+                  </div>
+                </div>
               </div>
             )}
             
-            <p>אם תרצה לקבל התראות שוב, תוכל לעבור לאפליקציה ולהירשם מחדש.</p>
-            <div>
-              <button onClick={() => router.push('/')} className="button">רישום מחדש</button>
-              <button onClick={() => router.push('/')} className="button secondary">חזרה לאפליקציה</button>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button 
+                onClick={() => router.push('/')} 
+                className="px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
+              >
+                רישום מחדש
+              </button>
+              <button 
+                onClick={() => router.push('/')} 
+                className="px-6 py-3 bg-secondary text-secondary-foreground rounded-lg font-medium hover:bg-secondary/80 transition-colors"
+              >
+                חזרה לאפליקציה
+              </button>
             </div>
           </div>
         );
 
       case 'expired':
+        const expiredStatusInfo = getStatusInfo('expired');
         return (
-          <div className="card animation">
-            {data && getStatusBadge('expired')}
+          <div className="animate-fade-in">
             {getIcon()}
-            <h1>ההרשמה פגה</h1>
-            <p>ההרשמה שלך להתראות פגה מאחר והתאריכים שביקשת כבר עברו.</p>
+            <h1 className="text-3xl font-light text-center mb-4 text-foreground">
+              ההרשמה פגה
+            </h1>
+            <p className="text-muted-foreground text-center mb-8 leading-relaxed">
+              ההרשמה שלך להתראות פגה מאחר והתאריכים שביקשת כבר עברו.
+            </p>
             
             {data && (
-              <div className="details-box">
-                <p><strong>פרטי ההרשמה שפגה:</strong></p>
-                <p>📧 כתובת מייל: {data.email}</p>
-                <p>📅 {formatCriteria(data.criteria_type, data.criteria)}</p>
-                <p>📊 התראות שנשלחו: {data.notification_count} מתוך 6</p>
-                <p>📆 נוצר ב: {formatDate(data.created_at)}</p>
-                <p>📨 התראה אחרונה: {data.last_notified ? formatDate(data.last_notified) : 'אף פעם'}</p>
+              <div className="bg-muted/50 rounded-xl p-6 mb-8 border border-border">
+                <h3 className="text-sm font-medium text-muted-foreground mb-4 text-center">
+                  פרטי ההרשמה שפגה
+                </h3>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">כתובת מייל</span>
+                    <span className="font-medium">{data.email}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">קריטריונים</span>
+                    <span className="font-medium">{formatCriteria(data.criteria_type, data.criteria)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">התראות שנשלחו</span>
+                    <span className="font-medium">{data.notification_count} מתוך 6</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-border">
+                    <span className="text-muted-foreground">סטטוס</span>
+                    <span className={`inline-flex items-center gap-1 px-2 py-1 bg-${expiredStatusInfo.color}-100 dark:bg-${expiredStatusInfo.color}-900/20 text-${expiredStatusInfo.color}-700 dark:text-${expiredStatusInfo.color}-300 rounded-md text-xs font-medium`}>
+                      {expiredStatusInfo.icon} {expiredStatusInfo.text}
+                    </span>
+                  </div>
+                </div>
               </div>
             )}
             
-            <p>תוכל לבצע הרשמה חדשה לתאריכים עתידיים באפליקציה.</p>
-            <div>
-              <button onClick={() => router.push('/')} className="button">רישום חדש</button>
-              <button onClick={() => router.push('/')} className="button secondary">חזרה לאפליקציה</button>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button 
+                onClick={() => router.push('/')} 
+                className="px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
+              >
+                רישום חדש
+              </button>
+              <button 
+                onClick={() => router.push('/')} 
+                className="px-6 py-3 bg-secondary text-secondary-foreground rounded-lg font-medium hover:bg-secondary/80 transition-colors"
+              >
+                חזרה לאפליקציה
+              </button>
             </div>
           </div>
         );
 
       case 'max_reached':
+        const maxStatusInfo = getStatusInfo('max_reached');
         return (
-          <div className="card animation">
-            {data && getStatusBadge('max_reached')}
+          <div className="animate-fade-in">
             {getIcon()}
-            <h1>הושלמו כל ההתראות</h1>
-            <p>ההרשמה שלך להתראות הושלמה לאחר שנשלחו לך 6 התראות מקסימליות.</p>
+            <h1 className="text-3xl font-light text-center mb-4 text-foreground">
+              הושלמו כל ההתראות
+            </h1>
+            <p className="text-muted-foreground text-center mb-8 leading-relaxed">
+              ההרשמה שלך להתראות הושלמה לאחר שנשלחו לך 6 התראות מקסימליות.
+            </p>
             
             {data && (
-              <div className="details-box">
-                <p><strong>פרטי ההרשמה שהושלמה:</strong></p>
-                <p>📧 כתובת מייל: {data.email}</p>
-                <p>📅 {formatCriteria(data.criteria_type, data.criteria)}</p>
-                <p>📊 התראות שנשלחו: {data.notification_count} מתוך 6 ✅</p>
-                <p>📆 נוצר ב: {formatDate(data.created_at)}</p>
-                <p>📨 התראה אחרונה: {data.last_notified ? formatDate(data.last_notified) : 'אף פעם'}</p>
+              <div className="bg-muted/50 rounded-xl p-6 mb-8 border border-border">
+                <h3 className="text-sm font-medium text-muted-foreground mb-4 text-center">
+                  פרטי ההרשמה שהושלמה
+                </h3>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">כתובת מייל</span>
+                    <span className="font-medium">{data.email}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">קריטריונים</span>
+                    <span className="font-medium">{formatCriteria(data.criteria_type, data.criteria)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">התראות שנשלחו</span>
+                    <span className="font-medium text-emerald-600 dark:text-emerald-400">{data.notification_count} מתוך 6 ✓</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-border">
+                    <span className="text-muted-foreground">סטטוס</span>
+                    <span className={`inline-flex items-center gap-1 px-2 py-1 bg-${maxStatusInfo.color}-100 dark:bg-${maxStatusInfo.color}-900/20 text-${maxStatusInfo.color}-700 dark:text-${maxStatusInfo.color}-300 rounded-md text-xs font-medium`}>
+                      {maxStatusInfo.icon} {maxStatusInfo.text}
+                    </span>
+                  </div>
+                </div>
               </div>
             )}
             
-            <p>המערכת הפסיקה לשלוח התראות לאחר שהגיעה למספר המקסימלי. תוכל לבצע הרשמה חדשה אם תרצה.</p>
-            <div>
-              <button onClick={() => router.push('/')} className="button">רישום חדש</button>
-              <button onClick={() => router.push('/')} className="button secondary">חזרה לאפליקציה</button>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button 
+                onClick={() => router.push('/')} 
+                className="px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
+              >
+                רישום חדש
+              </button>
+              <button 
+                onClick={() => router.push('/')} 
+                className="px-6 py-3 bg-secondary text-secondary-foreground rounded-lg font-medium hover:bg-secondary/80 transition-colors"
+              >
+                חזרה לאפליקציה
+              </button>
             </div>
           </div>
         );
 
       case 'not_found':
         return (
-          <div className="card animation">
+          <div className="animate-fade-in">
             {getIcon()}
-            <h1>הרשמה לא נמצאה</h1>
-            <p>הקישור שלחצת עליו אינו תקף או שההרשמה כבר הוסרה מהמערכת.</p>
-            <div className="details-box">
-              <p><strong>סיבות אפשריות:</strong></p>
-              <ul style={{ textAlign: 'right', marginTop: '0.5rem' }}>
-                <li>הקישור פג תוקף</li>
-                <li>ההרשמה כבר בוטלה בעבר</li>
-                <li>הקישור לא הועתק כראוי</li>
+            <h1 className="text-3xl font-light text-center mb-4 text-foreground">
+              הרשמה לא נמצאה
+            </h1>
+            <p className="text-muted-foreground text-center mb-8 leading-relaxed">
+              הקישור שלחצת עליו אינו תקף או שההרשמה כבר הוסרה מהמערכת.
+            </p>
+            
+            <div className="bg-muted/50 rounded-xl p-6 mb-8 border border-border">
+              <h3 className="text-sm font-medium text-muted-foreground mb-4 text-center">
+                סיבות אפשריות
+              </h3>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full"></span>
+                  הקישור פג תוקף
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full"></span>
+                  ההרשמה כבר בוטלה בעבר
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full"></span>
+                  הקישור לא הועתק כראוי
+                </li>
               </ul>
             </div>
-            <button onClick={() => router.push('/')} className="button">רישום מחדש לתורים</button>
+            
+            <button 
+              onClick={() => router.push('/')} 
+              className="px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors w-full sm:w-auto"
+            >
+              רישום מחדש לתורים
+            </button>
           </div>
         );
 
       case 'error':
       default:
         return (
-          <div className="card animation">
+          <div className="animate-fade-in">
             {getIcon()}
-            <h1>שגיאת מערכת</h1>
-            <p>אירעה שגיאה בעת ביטול ההרשמה. אנא נסה שוב מאוחר יותר.</p>
-            <div className="details-box">
-              <p><strong>מה אפשר לעשות:</strong></p>
-              <ul style={{ textAlign: 'right', marginTop: '0.5rem' }}>
-                <li>נסה לרענן את הדף</li>
-                <li>בדוק את החיבור לאינטרנט</li>
-                <li>פנה לתמיכה אם הבעיה נמשכת</li>
+            <h1 className="text-3xl font-light text-center mb-4 text-foreground">
+              שגיאת מערכת
+            </h1>
+            <p className="text-muted-foreground text-center mb-8 leading-relaxed">
+              אירעה שגיאה בעת ביטול ההרשמה. אנא נסה שוב מאוחר יותר.
+            </p>
+            
+            <div className="bg-muted/50 rounded-xl p-6 mb-8 border border-border">
+              <h3 className="text-sm font-medium text-muted-foreground mb-4 text-center">
+                מה אפשר לעשות
+              </h3>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full"></span>
+                  נסה לרענן את הדף
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full"></span>
+                  בדוק את החיבור לאינטרנט
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full"></span>
+                  פנה לתמיכה אם הבעיה נמשכת
+                </li>
               </ul>
             </div>
-            <div>
-              <button onClick={() => router.reload()} className="button">נסה שוב</button>
-              <button onClick={() => router.push('/')} className="button secondary">חזרה לאפליקציה</button>
+            
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button 
+                onClick={() => router.reload()} 
+                className="px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
+              >
+                נסה שוב
+              </button>
+              <button 
+                onClick={() => router.push('/')} 
+                className="px-6 py-3 bg-secondary text-secondary-foreground rounded-lg font-medium hover:bg-secondary/80 transition-colors"
+              >
+                חזרה לאפליקציה
+              </button>
             </div>
           </div>
         );
@@ -343,258 +511,34 @@ export default function UnsubscribePage() {
   };
 
   return (
-    <>
-      <style jsx global>{`
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Ploni', 'Arial Hebrew', sans-serif;
-          direction: rtl;
-        }
-        body {
-          background: linear-gradient(135deg, #f9fafb 0%, #e5e7eb 100%);
-          color: #111827;
-          min-height: 100vh;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          padding: 1rem;
-          transition: all 0.3s ease;
-          line-height: 1.6;
-        }
-        body.dark {
-          background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
-          color: #f9fafb;
-        }
-        .container {
-          max-width: 480px;
-          width: 100%;
-          margin: 0 auto;
-          text-align: center;
-        }
-        .card {
-          background-color: rgba(255, 255, 255, 0.95);
-          backdrop-filter: blur(10px);
-          border-radius: 16px;
-          padding: 2rem;
-          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-          margin-bottom: 1.5rem;
-          transition: all 0.3s ease;
-          border: 1px solid rgba(229, 231, 235, 0.8);
-        }
-        .dark .card {
-          background-color: rgba(31, 41, 55, 0.95);
-          border: 1px solid rgba(75, 85, 99, 0.8);
-          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
-        }
-        h1 {
-          font-size: 1.75rem;
-          margin-bottom: 1rem;
-          font-weight: 700;
-          color: #111827;
-        }
-        .dark h1 {
-          color: #f9fafb;
-        }
-        p {
-          margin-bottom: 1.5rem;
-          line-height: 1.6;
-          color: #4b5563;
-          font-size: 1rem;
-        }
-        .dark p {
-          color: #d1d5db;
-        }
-        .icon {
-          margin-bottom: 1.5rem;
-          width: 72px;
-          height: 72px;
-          margin-left: auto;
-          margin-right: auto;
-          opacity: 0.9;
-        }
-        .success {
-          color: #10b981;
-        }
-        .error {
-          color: #ef4444;
-        }
-        .warning {
-          color: #f59e0b;
-        }
-        .info {
-          color: #3b82f6;
-        }
-        .button {
-          display: inline-block;
-          background: linear-gradient(135deg, #111827 0%, #374151 100%);
-          color: white;
-          padding: 0.875rem 1.75rem;
-          border-radius: 8px;
-          border: none;
-          cursor: pointer;
-          font-weight: 600;
-          margin: 0.5rem;
-          transition: all 0.3s ease;
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-          font-size: 0.9rem;
-        }
-        .dark .button {
-          background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
-        }
-        .button:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 6px 12px -2px rgba(0, 0, 0, 0.15);
-        }
-        .button.secondary {
-          background: linear-gradient(135deg, #6b7280 0%, #9ca3af 100%);
-        }
-        .dark .button.secondary {
-          background: linear-gradient(135deg, #4b5563 0%, #6b7280 100%);
-        }
-        .toggle-theme {
-          position: fixed;
-          top: 1rem;
-          left: 1rem;
-          background: rgba(255, 255, 255, 0.2);
-          backdrop-filter: blur(10px);
-          border: 1px solid rgba(255, 255, 255, 0.3);
-          border-radius: 50%;
-          width: 48px;
-          height: 48px;
-          cursor: pointer;
-          color: #4b5563;
-          font-size: 1.25rem;
-          transition: all 0.3s ease;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .dark .toggle-theme {
-          background: rgba(31, 41, 55, 0.2);
-          border-color: rgba(31, 41, 55, 0.3);
-          color: #d1d5db;
-        }
-        .toggle-theme:hover {
-          transform: scale(1.05);
-        }
-        .status-badge {
-          display: inline-block;
-          padding: 0.375rem 0.75rem;
-          border-radius: 9999px;
-          font-size: 0.75rem;
-          font-weight: 600;
-          margin-bottom: 1rem;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-        }
-        .status-active {
-          background-color: #d1fae5;
-          color: #065f46;
-        }
-        .dark .status-active {
-          background-color: rgba(16, 185, 129, 0.2);
-          color: #6ee7b7;
-        }
-        .status-cancelled {
-          background-color: #fee2e2;
-          color: #991b1b;
-        }
-        .dark .status-cancelled {
-          background-color: rgba(239, 68, 68, 0.2);
-          color: #fca5a5;
-        }
-        .status-expired {
-          background-color: #fef3c7;
-          color: #92400e;
-        }
-        .dark .status-expired {
-          background-color: rgba(245, 158, 11, 0.2);
-          color: #fcd34d;
-        }
-        .status-max {
-          background-color: #e0e7ff;
-          color: #3730a3;
-        }
-        .dark .status-max {
-          background-color: rgba(99, 102, 241, 0.2);
-          color: #c7d2fe;
-        }
-        .details-box {
-          background-color: #f8fafc;
-          border: 1px solid #e2e8f0;
-          border-radius: 8px;
-          padding: 1rem;
-          margin: 1rem 0;
-          text-align: right;
-          font-size: 0.875rem;
-        }
-        .dark .details-box {
-          background-color: #1e293b;
-          border-color: #475569;
-        }
-        .animation {
-          animation: slideUp 0.6s ease-out;
-        }
-        @keyframes slideUp {
-          from { 
-            opacity: 0; 
-            transform: translateY(20px) scale(0.95); 
-          }
-          to { 
-            opacity: 1; 
-            transform: translateY(0) scale(1); 
-          }
-        }
-        @media (max-width: 640px) {
-          .container {
-            padding: 0 0.5rem;
-          }
-          .card {
-            padding: 1.5rem;
-            border-radius: 12px;
-          }
-          h1 {
-            font-size: 1.5rem;
-          }
-          .button {
-            display: block;
-            width: 100%;
-            margin: 0.5rem 0;
-          }
-          .toggle-theme {
-            width: 40px;
-            height: 40px;
-            font-size: 1rem;
-          }
-        }
-        @media (max-width: 480px) {
-          body {
-            padding: 0.5rem;
-          }
-          .card {
-            padding: 1.25rem;
-          }
-          h1 {
-            font-size: 1.375rem;
-          }
-        }
-      `}</style>
-      
-      <div className={darkMode ? 'dark' : ''}>
-        <button 
-          className="toggle-theme" 
-          onClick={() => setDarkMode(!darkMode)}
-          aria-label="החלף מצב תצוגה"
-        >
-          🌓
-        </button>
-        <div className="container">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      {/* Theme Toggle */}
+      <div className="fixed top-4 left-4 z-10">
+        <ThemeToggle />
+      </div>
+
+      {/* Main Content */}
+      <div className="w-full max-w-md">
+        <div className="bg-card rounded-2xl border border-border shadow-lg p-8">
+          {/* Brand Header */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-12 h-12 bg-primary/10 rounded-full mb-4">
+              <span className="text-xl font-light">רם</span>
+            </div>
+            <h2 className="text-lg font-light text-muted-foreground">
+              מספרת רם-אל • ביטול הרשמה
+            </h2>
+          </div>
+
+          {/* Content */}
           {renderContent()}
         </div>
+
+        {/* Footer */}
+        <div className="text-center mt-6 text-xs text-muted-foreground">
+          © 2024 מספרת רם-אל • מערכת התראות אוטומטית
+        </div>
       </div>
-    </>
+    </div>
   );
 } 
