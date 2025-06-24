@@ -3,6 +3,45 @@ import type { AppProps } from 'next/app'
 import Head from 'next/head'
 import { useEffect, useState } from 'react'
 
+// Custom ThemeProvider implementation
+function ThemeProvider({ children }: { children: React.ReactNode }) {
+  // This runs only on the client-side
+  useEffect(() => {
+    // Check localStorage or system preference
+    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null
+    
+    if (savedTheme) {
+      // Apply saved theme
+      document.documentElement.classList.toggle('dark', savedTheme === 'dark')
+      
+      // Update theme-color meta tag for notch/status bar
+      const metaThemeColor = document.querySelector('meta[name="theme-color"]')
+      if (metaThemeColor) {
+        metaThemeColor.setAttribute(
+          'content',
+          savedTheme === 'dark' ? '#171717' : '#FFFFFF'
+        )
+      }
+    } else {
+      // Check system preference
+      const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      document.documentElement.classList.toggle('dark', systemPrefersDark)
+      localStorage.setItem('theme', systemPrefersDark ? 'dark' : 'light')
+      
+      // Update theme-color meta tag
+      const metaThemeColor = document.querySelector('meta[name="theme-color"]')
+      if (metaThemeColor) {
+        metaThemeColor.setAttribute(
+          'content',
+          systemPrefersDark ? '#171717' : '#FFFFFF'
+        )
+      }
+    }
+  }, [])
+  
+  return <>{children}</>
+}
+
 export default function App({ Component, pageProps }: AppProps) {
   const [mounted, setMounted] = useState(false)
 
@@ -31,7 +70,7 @@ export default function App({ Component, pageProps }: AppProps) {
   }
 
   return (
-    <>
+    <ThemeProvider>
       <Head>
         {/* Preload Hebrew fonts for better performance */}
         <link
@@ -69,13 +108,14 @@ export default function App({ Component, pageProps }: AppProps) {
         {/* PWA Configuration */}
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="white" />
-        <meta name="theme-color" content="#FFFFFF" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        {/* Theme color will be set dynamically via JavaScript */}
+        <meta name="theme-color" content="#FFFFFF" id="theme-color-meta" />
         <meta name="msapplication-TileColor" content="#FFFFFF" />
         <meta name="msapplication-config" content="/browserconfig.xml" />
         
-        {/* Manifest */}
-        <link rel="manifest" href="/manifest.json" />
+        {/* Dynamic Manifest - will be switched based on theme */}
+        <link rel="manifest" href="/api/manifest" id="manifest-link" />
         
         {/* Icons */}
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
@@ -105,9 +145,9 @@ export default function App({ Component, pageProps }: AppProps) {
         `}</style>
       </Head>
       
-      <div className="font-hebrew min-h-screen bg-background text-foreground">
+      <div className="font-hebrew min-h-screen bg-background text-foreground transition-colors duration-300">
         <Component {...pageProps} />
       </div>
-    </>
+    </ThemeProvider>
   )
 } 

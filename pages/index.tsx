@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Calendar as CalendarIcon, Clock, Search, Smartphone, Wifi, WifiOff, Share2, Copy, Download, MapPin, ExternalLink } from 'lucide-react';
+import { ThemeToggle } from '../components/ui/theme-toggle';
 import PWABanner from '../components/PWABanner';
 import CachedResults from '../components/CachedResults';
 import NotificationSubscribe from '../components/NotificationSubscribe';
@@ -677,7 +678,8 @@ ${availableResults.length} תאריכים זמינים
         <title>תורים לרם-אל | בדיקת תורים פנויים</title>
         <meta name="description" content="בדיקת תורים פנויים למספרת רם-אל" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-        <meta name="theme-color" content="#FFFFFF" />
+        {/* Theme color set dynamically based on current theme */}
+        <meta name="theme-color" content="#FFFFFF" id="theme-color-meta" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <link rel="icon" href="/favicon.ico" />
@@ -711,19 +713,22 @@ ${availableResults.length} תאריכים זמינים
                   alt="תור רם-אל"
                   className="w-8 h-8 rounded-lg shadow-sm"
                 />
-                <div className="absolute inset-0 rounded-lg bg-gradient-to-tr from-white/10 to-transparent"></div>
+                <div className="absolute inset-0 rounded-lg bg-gradient-to-tr from-white/10 to-transparent dark:from-black/10"></div>
               </div>
               <h2 className="text-sm font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
                 תורים לרם-אל
               </h2>
             </div>
             
-            <button
-              onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}
-              className="text-[10px] bg-primary/5 hover:bg-primary/10 px-2 py-1 rounded-full text-primary/90 transition-colors"
-            >
-              חזרה למעלה
-            </button>
+            <div className="flex items-center gap-2">
+              <ThemeToggle className="mr-1" />
+              <button
+                onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}
+                className="text-[10px] bg-primary/5 hover:bg-primary/10 px-2 py-1 rounded-full text-primary/90 transition-colors"
+              >
+                חזרה למעלה
+              </button>
+            </div>
           </div>
         </header>
         
@@ -733,12 +738,12 @@ ${availableResults.length} תאריכים זמינים
         }`}>
           <div className="flex flex-col items-center gap-3 mb-3">
             <div className="relative">
-            <img 
-              src="/icons/icon-72x72.png" 
-              alt="תור רם-אל"
+              <img 
+                src="/icons/icon-72x72.png" 
+                alt="תור רם-אל"
                 className="w-16 h-16 rounded-2xl shadow-lg"
-            />
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-white/20 to-transparent"></div>
+              />
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-white/20 to-transparent dark:from-black/20"></div>
             </div>
             
             <div className="text-center">
@@ -749,7 +754,12 @@ ${availableResults.length} תאריכים זמינים
             </div>
           </div>
           
-          <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent mt-4"></div>
+          <div className="relative">
+            <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent mt-4"></div>
+            <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-background p-1 rounded-full">
+              <ThemeToggle />
+            </div>
+          </div>
         </header>
         
         {/* Cached Results Component */}
