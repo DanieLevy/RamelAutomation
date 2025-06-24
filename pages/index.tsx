@@ -15,6 +15,7 @@ import ManualSearch from '../components/ManualSearch';
 import { DatePicker, DateRangePicker } from '@/components/ui/date-picker';
 import { createClient } from '@supabase/supabase-js';
 import { format, parseISO, addDays } from 'date-fns';
+import { useRouter } from 'next/router';
 
 interface AppointmentResult {
   date: string;
@@ -167,6 +168,8 @@ export default function Home() {
 
   // State for sticky header
   const [isHeaderSticky, setIsHeaderSticky] = useState(false)
+
+  const router = useRouter();
 
   useEffect(() => {
     // Check online status
@@ -803,6 +806,23 @@ ${availableResults.length} תאריכים זמינים
           formatTimeIsrael={formatTimeIsrael}
           generateBookingUrl={generateBookingUrl}
         />
+        
+                  <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button onClick={checkAppointments} disabled={loading} className="px-8 py-3 text-lg">
+              {loading ? 'מחפש...' : 'חפש תורים'}
+            </Button>
+            
+            <Button 
+              onClick={() => router.push('/manage')} 
+              variant="outline" 
+              className="px-8 py-3 text-lg gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              נהל התראות
+            </Button>
+          </div>
         
         {/* Footer */}
         <div className="mt-8 mb-4 opacity-80 hover:opacity-100 transition-opacity">

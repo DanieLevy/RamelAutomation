@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
+import { generateUnsubscribeEmailTemplate } from '@/lib/emailTemplates';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL!,
@@ -509,6 +510,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (updateError) {
       throw updateError;
+    }
+
+    // Send modern unsubscribe confirmation email
+    try {
+      const nodemailer = require('nodemailer');
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: process.env.EMAIL_SENDER,
+          pass: process.env.EMAIL_APP_PASSWORD,
+        },
+      });
+      const unsubscribeEmail = generateUnsubscribeEmailTemplate({
+        userEmail: data.email,
+        criteriaText: criteriaText || '',
+        unsubscribeDate: new Date().toLocaleDateString('he-IL'),
+        manageUrl: 'https://tor-ramel.netlify.app/manage'
+      });
+      await transporter.sendMail({
+        from: `"תור רם-אל" <${process.env.EMAIL_SENDER}>`,
+        to: data.email,
+        subject: unsubscribeEmail.subject,
+        html: unsubscribeEmail.html,
+        text: unsubscribeEmail.text
+      });
+      transporter.close();
+    } catch (emailError) {
+      console.error('Failed to send unsubscribe confirmation email:', emailError);
     }
 
     // Success page - subscription cancelled

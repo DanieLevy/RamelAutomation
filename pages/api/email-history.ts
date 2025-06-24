@@ -1,10 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabase = supabaseAdmin;
 
 interface EmailHistoryEntry {
   notification_id: string;
@@ -171,48 +168,5 @@ async function handleGetHistory(req: NextApiRequest, res: NextApiResponse) {
 }
 
 async function createEmailHistoryTable() {
-  try {
-    // Create the email_history table using raw SQL
-    const { error } = await supabase.rpc('exec_sql', {
-      sql: `
-        CREATE TABLE IF NOT EXISTS email_history (
-          id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-          notification_id UUID NOT NULL REFERENCES notifications(id) ON DELETE CASCADE,
-          email_count INTEGER NOT NULL,
-          sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          appointment_data JSONB,
-          email_subject TEXT,
-          email_status TEXT DEFAULT 'sent' CHECK (email_status IN ('sent', 'failed')),
-          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          updated_at TIMESTAMPTZ DEFAULT NOW()
-        );
-
-        -- Create indexes for better performance
-        CREATE INDEX IF NOT EXISTS idx_email_history_notification_id ON email_history(notification_id);
-        CREATE INDEX IF NOT EXISTS idx_email_history_sent_at ON email_history(sent_at);
-        CREATE INDEX IF NOT EXISTS idx_email_history_email_count ON email_history(email_count);
-
-        -- Enable RLS (Row Level Security)
-        ALTER TABLE email_history ENABLE ROW LEVEL SECURITY;
-
-        -- Create policy to allow public read access (for management page)
-        CREATE POLICY "Allow public read access to email_history" ON email_history
-          FOR SELECT USING (true);
-
-        -- Create policy to allow service role to insert/update
-        CREATE POLICY "Allow service role full access to email_history" ON email_history
-          FOR ALL USING (auth.role() = 'service_role');
-      `
-    });
-
-    if (error) {
-      console.error('📧 ❌ Failed to create email_history table:', error);
-      throw error;
-    }
-
-    console.log('📧 ✅ Email history table created successfully');
-  } catch (error) {
-    console.error('📧 ❌ Error creating email_history table:', error);
-    throw error;
-  }
-} 
+  // ... existing code ...
+}

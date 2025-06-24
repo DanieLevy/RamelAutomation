@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
 import { generateModernEmailTemplate } from '@/lib/emailTemplates';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 // ============================================================================
 // EMAIL NOTIFICATION PROCESSOR
@@ -9,10 +9,7 @@ import { generateModernEmailTemplate } from '@/lib/emailTemplates';
 // Benefit: Keeps auto-check function under 8 seconds, emails processed separately
 // ============================================================================
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_ANON_KEY!
-);
+const supabase = supabaseAdmin;
 
 // Israel timezone utilities
 const ISRAEL_TIMEZONE = 'Asia/Jerusalem';
@@ -97,7 +94,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.log(`📧 Using provided appointments: ${appointments.length}`);
     } else {
       // Fallback: fetch from cache
-      const { data: cacheData } = await supabase
+      const { data: cacheData } = await supabaseAdmin
         .from('cache')
         .select('value')
         .eq('key', 'auto-check-minimal')
@@ -184,36 +181,122 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             currentNotification = freshNotification || notification;
           }
           
-          // Check notification constraints
+          // Enhanced notification timing and constraints
           const currentNotifCount = currentNotification.notification_count || 0;
+          const phaseCount = currentNotification.phase_count || 0;
+          const notificationPhase = currentNotification.notification_phase || 'initial';
           const now = new Date();
           const lastNotified = currentNotification.last_notified ? new Date(currentNotification.last_notified) : null;
           const timeSinceLastNotification = lastNotified ? now.getTime() - lastNotified.getTime() : Infinity;
 
-          // Skip if max emails reached
+          // Skip if max emails reached (6 total)
           if (currentNotifCount >= 6) {
             await supabase
               .from('notifications')
-              .update({ status: 'max_reached', updated_at: new Date().toISOString() })
+              .update({ 
+                status: 'max_reached', 
+                notification_phase: 'completed',
+                updated_at: new Date().toISOString() 
+              })
               .eq('id', notification.id);
             console.log(`📧 Max emails reached for ${notification.email} - marking as max_reached`);
             emailsSkipped++;
             continue;
           }
-          
-          if (isTestMode) {
-            console.log(`📧 🧪 TEST: Processing email for ${currentNotification.email}, current count: ${currentNotifCount}, will be: ${currentNotifCount + 1}`);
+
+          // Enhanced timing logic: First 3 emails: 10min apart, Next 3: 1hr apart
+          let requiredInterval;
+          if (currentNotifCount < 3) {
+            // First phase: 10 minutes between emails
+            requiredInterval = 10 * 60 * 1000; // 10 minutes
+          } else {
+            // Second phase: 1 hour between emails
+            requiredInterval = 60 * 60 * 1000; // 1 hour
           }
 
-          // Skip if too soon since last notification (10 minutes minimum) - unless in test mode
-          if (!isTestMode && timeSinceLastNotification < 10 * 60 * 1000) {
-            console.log(`📧 Too soon for ${notification.email} (${Math.round(timeSinceLastNotification / 60000)}m ago)`);
+          if (isTestMode) {
+            console.log(`📧 🧪 TEST: Processing email for ${currentNotification.email}, count: ${currentNotifCount}, phase: ${notificationPhase}`);
+          }
+
+          // Skip if too soon since last notification - unless in test mode
+          if (!isTestMode && timeSinceLastNotification < requiredInterval) {
+            const minutesRemaining = Math.ceil((requiredInterval - timeSinceLastNotification) / 60000);
+            console.log(`📧 Too soon for ${notification.email} (${minutesRemaining}m remaining)`);
             emailsSkipped++;
             continue;
           }
           
-          if (isTestMode && timeSinceLastNotification < 10 * 60 * 1000) {
+          if (isTestMode && timeSinceLastNotification < requiredInterval) {
             console.log(`📧 🧪 TEST MODE: Bypassing rate limit for ${notification.email}`);
+          }
+
+          // Filter out appointments that user has marked as "not_wanted"
+          const { data: rejectedAppointments } = await supabase
+            .from('user_appointment_responses')
+            .select('appointment_date')
+            .eq('notification_id', currentNotification.id)
+            .eq('response_status', 'not_wanted');
+
+          const rejectedDates = new Set(rejectedAppointments?.map(r => r.appointment_date) || []);
+          
+          // Filter matching results to exclude rejected appointments
+          const filteredResults = matchingResults.filter(apt => !rejectedDates.has(apt.date));
+          
+          if (filteredResults.length === 0) {
+            console.log(`📧 All appointments rejected by user for ${notification.email}`);
+            emailsSkipped++;
+            continue;
+          }
+
+          console.log(`📧 Found ${filteredResults.length} new appointments for ${notification.email} (${rejectedDates.size} rejected)`);
+
+          // Use filtered results for email content
+          matchingResults = filteredResults;
+
+          // Create or update user appointment responses with tokens
+          const responseTokens: { [key: string]: string } = {};
+          
+          for (const appointment of matchingResults) {
+            try {
+              // Optimistically attempt to insert the record.
+              // If it fails with a unique constraint violation (code 23505), it's a race condition.
+              // In that case, we can safely fetch the existing record.
+              const { data: response, error: responseError } = await supabase
+                .from('user_appointment_responses')
+                .insert({
+                  notification_id: currentNotification.id,
+                  appointment_date: appointment.date,
+                  appointment_times: appointment.times,
+                  response_status: 'pending'
+                })
+                .select('response_token')
+                .single();
+
+              if (responseError) {
+                if (responseError.code === '23505') { // Unique constraint violation
+                  console.log(`📧 Race condition detected for ${appointment.date}. Fetching existing token.`);
+                  const { data: existingResponse, error: selectError } = await supabase
+                    .from('user_appointment_responses')
+                    .select('response_token')
+                    .eq('notification_id', currentNotification.id)
+                    .eq('appointment_date', appointment.date)
+                    .single();
+
+                  if (selectError) {
+                    console.error(`🚨 Failed to fetch token after race condition for ${appointment.date}:`, selectError);
+                  } else if (existingResponse) {
+                    responseTokens[appointment.date] = existingResponse.response_token;
+                  }
+                } else {
+                  // A different, unexpected error occurred
+                  console.error(`🚨 Failed to create response record for ${appointment.date}:`, responseError);
+                }
+              } else if (response) {
+                responseTokens[appointment.date] = response.response_token;
+              }
+            } catch (error) {
+              console.error(`🚨 Unhandled error managing response record for ${appointment.date}:`, error);
+            }
           }
 
           // Generate modern email content using the new template system
@@ -222,7 +305,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             notificationCount: currentNotifCount,
             unsubscribeUrl: `https://tor-ramel.netlify.app/unsubscribe?token=${currentNotification.unsubscribe_token}`,
             userEmail: currentNotification.email,
-            criteriaType: currentNotification.criteria_type as 'single' | 'range'
+            criteriaType: currentNotification.criteria_type as 'single' | 'range',
+            responseTokens,
+            notificationId: currentNotification.id
           });
 
           const mailOptions = {
@@ -243,9 +328,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 const emailResult = await transporter.sendMail(mailOptions);
                 console.log(`📧 ✅ Email sent successfully: ${emailResult.messageId}`);
                 
-                // Calculate new values
+                // Calculate new values with enhanced phase management
                 const newNotificationCount = currentNotifCount + 1;
-                const newStatus = newNotificationCount >= 6 ? 'max_reached' : 'active';
+                let newStatus = 'active';
+                let newPhase = notificationPhase;
+                let newPhaseCount = phaseCount;
+
+                // Determine phase and status
+                if (newNotificationCount >= 6) {
+                  newStatus = 'max_reached';
+                  newPhase = 'completed';
+                } else if (newNotificationCount <= 3) {
+                  newPhase = 'initial';
+                  newPhaseCount = newNotificationCount;
+                } else {
+                  newPhase = 'extended';
+                  newPhaseCount = newNotificationCount - 3;
+                }
                 
                 // Track email history (non-blocking)
                 try {
@@ -264,13 +363,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                   console.log('📧 ⚠️ Email history tracking failed (non-critical):', historyError instanceof Error ? historyError.message : 'Unknown error');
                 }
                 
-                // Update notification record with proper transaction handling
+                // Update notification record with enhanced phase tracking
                 const { error: updateError } = await supabase
                   .from('notifications')
                   .update({
                     last_notified: new Date().toISOString(),
                     notification_count: newNotificationCount,
                     status: newStatus,
+                    notification_phase: newPhase,
+                    phase_count: newPhaseCount,
                     updated_at: new Date().toISOString()
                   })
                   .eq('id', currentNotification.id);
@@ -280,10 +381,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                   throw new Error(`Database update failed: ${updateError.message}`);
                 }
                 
-                console.log(`📧 ✅ Sent email #${newNotificationCount} to ${currentNotification.email} (status: ${newStatus})`);
+                console.log(`📧 ✅ Sent email #${newNotificationCount} to ${currentNotification.email} (${newPhase} phase, status: ${newStatus})`);
                 
                 if (newStatus === 'max_reached') {
                   console.log(`🏁 Notification completed for ${currentNotification.email} - 6 emails sent`);
+                } else if (newPhase === 'extended' && newPhaseCount === 1) {
+                  console.log(`📧 🔄 ${currentNotification.email} entered extended phase - switching to 1hr intervals`);
                 }
                 
                 return { success: true, email: currentNotification.email, count: newNotificationCount, status: newStatus };
