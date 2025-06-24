@@ -247,6 +247,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 const newNotificationCount = currentNotifCount + 1;
                 const newStatus = newNotificationCount >= 6 ? 'max_reached' : 'active';
                 
+                // Track email history (non-blocking)
+                try {
+                  await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/email-history`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      notification_id: currentNotification.id,
+                      email_count: newNotificationCount,
+                      appointment_data: matchingResults,
+                      email_subject: emailContent.subject,
+                      email_status: 'sent'
+                    })
+                  });
+                } catch (historyError) {
+                  console.log('📧 ⚠️ Email history tracking failed (non-critical):', historyError instanceof Error ? historyError.message : 'Unknown error');
+                }
+                
                 // Update notification record with proper transaction handling
                 const { error: updateError } = await supabase
                   .from('notifications')

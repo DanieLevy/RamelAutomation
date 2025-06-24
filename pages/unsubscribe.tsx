@@ -239,8 +239,14 @@ export default function UnsubscribePage() {
                 רישום מחדש
               </button>
               <button 
-                onClick={() => router.push('/')} 
+                onClick={() => router.push(`/manage?email=${encodeURIComponent(data?.email || '')}`)} 
                 className="px-6 py-3 bg-secondary text-secondary-foreground rounded-lg font-medium hover:bg-secondary/80 transition-colors"
+              >
+                נהל התראות
+              </button>
+              <button 
+                onClick={() => router.push('/')} 
+                className="px-6 py-3 bg-muted text-muted-foreground rounded-lg font-medium hover:bg-muted/80 transition-colors"
               >
                 חזרה לאפליקציה
               </button>
@@ -296,8 +302,14 @@ export default function UnsubscribePage() {
                 רישום מחדש
               </button>
               <button 
-                onClick={() => router.push('/')} 
+                onClick={() => router.push(`/manage?email=${encodeURIComponent(data?.email || '')}`)} 
                 className="px-6 py-3 bg-secondary text-secondary-foreground rounded-lg font-medium hover:bg-secondary/80 transition-colors"
+              >
+                נהל התראות
+              </button>
+              <button 
+                onClick={() => router.push('/')} 
+                className="px-6 py-3 bg-muted text-muted-foreground rounded-lg font-medium hover:bg-muted/80 transition-colors"
               >
                 חזרה לאפליקציה
               </button>
@@ -353,8 +365,14 @@ export default function UnsubscribePage() {
                 רישום חדש
               </button>
               <button 
-                onClick={() => router.push('/')} 
+                onClick={() => router.push(`/manage?email=${encodeURIComponent(data?.email || '')}`)} 
                 className="px-6 py-3 bg-secondary text-secondary-foreground rounded-lg font-medium hover:bg-secondary/80 transition-colors"
+              >
+                נהל התראות
+              </button>
+              <button 
+                onClick={() => router.push('/')} 
+                className="px-6 py-3 bg-muted text-muted-foreground rounded-lg font-medium hover:bg-muted/80 transition-colors"
               >
                 חזרה לאפליקציה
               </button>
@@ -410,8 +428,14 @@ export default function UnsubscribePage() {
                 רישום חדש
               </button>
               <button 
-                onClick={() => router.push('/')} 
+                onClick={() => router.push(`/manage?email=${encodeURIComponent(data?.email || '')}`)} 
                 className="px-6 py-3 bg-secondary text-secondary-foreground rounded-lg font-medium hover:bg-secondary/80 transition-colors"
+              >
+                נהל התראות
+              </button>
+              <button 
+                onClick={() => router.push('/')} 
+                className="px-6 py-3 bg-muted text-muted-foreground rounded-lg font-medium hover:bg-muted/80 transition-colors"
               >
                 חזרה לאפליקציה
               </button>

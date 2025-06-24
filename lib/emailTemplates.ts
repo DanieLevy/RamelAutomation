@@ -115,7 +115,7 @@ ${matchingResults.map(apt =>
 - - - - - - - - - -
 
 לניהול ההתראות או לקביעה מהירה, בקר באתר שלנו:
-https://tor-ramel.netlify.app
+https://tor-ramel.netlify.app/manage?email=${encodeURIComponent(userEmail)}
 
 תודה,
 צוות Tor-RamEl
@@ -316,7 +316,7 @@ https://tor-ramel.netlify.app
       <div class="footer">
         <p style="margin: 0 0 16px 0;">נשלח אל ${userEmail}</p>
         <p style="margin: 0 0 16px 0;">
-          <a href="https://tor-ramel.netlify.app/" target="_blank" class="secondary-link">ניהול התראות</a>
+          <a href="https://tor-ramel.netlify.app/manage?email=${encodeURIComponent(userEmail)}" target="_blank" class="secondary-link">ניהול התראות</a>
           &nbsp;&nbsp;·&nbsp;&nbsp;
           <a href="${unsubscribeUrl}" target="_blank" class="secondary-link">הסר הרשמה</a>
         </p>

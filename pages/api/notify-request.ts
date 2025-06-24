@@ -122,8 +122,9 @@ const generateConfirmationEmail = (email: string, criteria: any, criteria_type: 
                 תור רם-אל - מערכת חכמה לניהול תורים
             </p>
             <p style="margin: 0; color: #64748b; font-size: 12px;">
-                לא רוצה לקבל התראות? 
-                <a href="https://tor-ramel.netlify.app/unsubscribe" style="color: #0ea5e9; text-decoration: none;">בטל את המנוי</a>
+                <a href="https://tor-ramel.netlify.app/manage?email=${encodeURIComponent(email)}" style="color: #0ea5e9; text-decoration: none;">נהל התראות</a>
+                &nbsp;·&nbsp;
+                <a href="https://tor-ramel.netlify.app/unsubscribe" style="color: #0ea5e9; text-decoration: none;">בטל מנוי</a>
             </p>
         </div>
     </div>
@@ -149,6 +150,7 @@ const generateConfirmationEmail = (email: string, criteria: any, criteria_type: 
 
 תודה שבחרת בתור רם-אל!
 
+ניהול התראות: https://tor-ramel.netlify.app/manage?email=${encodeURIComponent(email)}
 האתר: https://tor-ramel.netlify.app
 `.trim();
 
