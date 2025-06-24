@@ -69,9 +69,9 @@ export default function App({ Component, pageProps }: AppProps) {
         {/* PWA Configuration */}
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="theme-color" content="#3B82F6" />
-        <meta name="msapplication-TileColor" content="#3B82F6" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="white" />
+        <meta name="theme-color" content="#FFFFFF" />
+        <meta name="msapplication-TileColor" content="#FFFFFF" />
         <meta name="msapplication-config" content="/browserconfig.xml" />
         
         {/* Manifest */}

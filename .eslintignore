@@ -1,0 +1,14 @@
+# Build artifacts
+.next/
+out/
+node_modules/
+
+# Public static files
+public/
+
+# PWA manifest files
+public/manifest.json
+public/manifest-template.json
+
+# Service worker
+public/sw.js 

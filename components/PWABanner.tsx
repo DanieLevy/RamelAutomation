@@ -29,11 +29,14 @@ export default function PWABanner({ onInstall, onDismiss, ios = false, canInstal
     setTimeout(onInstall, 300)
   }
 
+  // Show different content for iOS
+  const isIOSDevice = ios || isIOS || (typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream);
+
   return (
-    <div className={`fixed bottom-0 left-0 right-0 z-50 p-4 bg-gradient-to-t from-background via-background/95 to-transparent backdrop-blur-sm border-t border-primary/20 ${
+    <div className={`fixed bottom-0 left-0 right-0 z-50 p-4 bg-gradient-to-t from-background via-background/95 to-transparent border-t border-primary/20 ${
       isVisible ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'
     }`}>
-      <div className="max-w-sm mx-auto bg-card/95 backdrop-blur-md rounded-2xl shadow-2xl border border-primary/20 overflow-hidden">
+      <div className="max-w-sm mx-auto bg-card rounded-2xl shadow-2xl border border-primary/20 overflow-hidden">
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-secondary to-accent"></div>
         
         <div className="p-4">
@@ -68,6 +71,27 @@ export default function PWABanner({ onInstall, onDismiss, ios = false, canInstal
             </button>
           </div>
           
+          {isIOSDevice ? (
+            <div className="mb-3 text-xs text-muted-foreground">
+              <ol className="list-decimal list-inside space-y-1 rtl">
+                <li>לחץ על <span className="inline-flex items-center bg-muted/40 px-1.5 py-0.5 rounded text-[10px]">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="8 17 12 21 16 17"></polyline>
+                    <line x1="12" y1="12" x2="12" y2="21"></line>
+                    <path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"></path>
+                  </svg>
+                  <span className="mr-1">שתף</span></span>
+                </li>
+                <li>גלול ולחץ על <span className="inline-flex items-center bg-muted/40 px-1.5 py-0.5 rounded text-[10px]">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
+                  </svg>
+                  <span className="mr-1">הוסף למסך הבית</span></span>
+                </li>
+              </ol>
+            </div>
+          ) : null}
+          
           <div className="flex gap-2">
             <button
               onClick={handleDismiss}
@@ -75,13 +99,22 @@ export default function PWABanner({ onInstall, onDismiss, ios = false, canInstal
             >
               לא תודה
             </button>
-            <button
-              onClick={handleInstall}
-              disabled={!canInstall}
-              className="flex-1 px-3 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
-            >
-              התקן
-            </button>
+            {!isIOSDevice ? (
+              <button
+                onClick={handleInstall}
+                disabled={!canInstall}
+                className="flex-1 px-3 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+              >
+                התקן
+              </button>
+            ) : (
+              <button
+                onClick={handleDismiss}
+                className="flex-1 px-3 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors shadow-lg"
+              >
+                הבנתי
+              </button>
+            )}
           </div>
         </div>
       </div>

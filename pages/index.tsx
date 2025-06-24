@@ -285,7 +285,7 @@ export default function Home() {
       window.removeEventListener('appinstalled', handleAppInstalled)
       mediaQuery.removeListener(handleDisplayModeChange)
     }
-  }, [])
+  }, [installPrompt])
 
   const handleInstall = async () => {
     if (!installPrompt) {
@@ -677,7 +677,7 @@ ${availableResults.length} תאריכים זמינים
         <title>תורים לרם-אל | בדיקת תורים פנויים</title>
         <meta name="description" content="בדיקת תורים פנויים למספרת רם-אל" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-        <meta name="theme-color" content="#3b82f6" />
+        <meta name="theme-color" content="#FFFFFF" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <link rel="icon" href="/favicon.ico" />
@@ -703,7 +703,7 @@ ${availableResults.length} תאריכים זמינים
               : 'translate-y-[-100%] opacity-0'
           }`}
         >
-          <div className="max-w-screen-sm mx-auto px-4 py-2 backdrop-blur-lg bg-background/70 border-b border-border/30 shadow-sm flex items-center justify-between">
+          <div className="max-w-screen-sm mx-auto px-4 py-2 bg-background border-b border-border/30 shadow-sm flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="relative">
                 <img 
@@ -736,7 +736,7 @@ ${availableResults.length} תאריכים זמינים
             <img 
               src="/icons/icon-72x72.png" 
               alt="תור רם-אל"
-                className="w-16 h-16 rounded-2xl shadow-lg backdrop-blur-sm"
+                className="w-16 h-16 rounded-2xl shadow-lg"
             />
               <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-white/20 to-transparent"></div>
             </div>
