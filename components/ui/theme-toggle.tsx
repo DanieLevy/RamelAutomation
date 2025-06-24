@@ -67,13 +67,13 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
       variant="ghost"
       size="icon"
       onClick={toggleTheme}
-      className={`w-8 h-8 rounded-full ${className}`}
+      className={`theme-toggle-btn ${className}`}
       title={theme === "light" ? "עבור למצב כהה" : "עבור למצב בהיר"}
     >
       {theme === "light" ? (
-        <Moon className="h-4 w-4" />
+        <Moon className="theme-icon" />
       ) : (
-        <Sun className="h-4 w-4" />
+        <Sun className="theme-icon" />
       )}
       <span className="sr-only">
         {theme === "light" ? "עבור למצב כהה" : "עבור למצב בהיר"}

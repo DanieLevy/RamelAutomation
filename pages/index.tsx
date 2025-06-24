@@ -694,72 +694,72 @@ ${availableResults.length} תאריכים זמינים
         />
       )}
 
-      <div className={`page-container mx-auto px-4 py-6 max-w-screen-sm transition-all duration-300 ${
-        isHeaderSticky ? 'pt-16' : 'pt-6'
+      <div className={`page-container mx-auto px-4 py-5 max-w-screen-sm transition-all duration-300 ${
+        isHeaderSticky ? 'pt-12' : 'pt-4'
       }`} dir="rtl">
         {/* Sticky Header - shows when scrolling */}
         <header 
-          className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 transform ${
+          className={`fixed top-0 left-0 right-0 z-50 sticky-header ${
             isHeaderSticky 
-              ? 'translate-y-0 opacity-100' 
+              ? 'translate-y-0 opacity-100 shadow-sm' 
               : 'translate-y-[-100%] opacity-0'
           }`}
         >
-          <div className="max-w-screen-sm mx-auto px-4 py-2 bg-background border-b border-border/30 shadow-sm flex items-center justify-between">
+          <div className="sticky-header-content max-w-screen-sm mx-auto px-4 py-1.5 bg-background/95 dark:bg-background/90 border-b border-border/20 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="relative">
+              <div className="relative flex items-center">
                 <img 
                   src="/icons/icon-72x72.png" 
                   alt="תור רם-אל"
-                  className="w-8 h-8 rounded-lg shadow-sm"
+                  className="w-6 h-6 rounded-md"
                 />
-                <div className="absolute inset-0 rounded-lg bg-gradient-to-tr from-white/10 to-transparent dark:from-black/10"></div>
+                <div className="absolute inset-0 rounded-md bg-gradient-to-tr from-white/10 to-transparent dark:from-black/10"></div>
               </div>
-              <h2 className="text-sm font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+              <h2 className="text-xs font-medium text-foreground">
                 תורים לרם-אל
               </h2>
             </div>
             
             <div className="flex items-center gap-2">
-              <ThemeToggle className="mr-1" />
+              <ThemeToggle />
               <button
                 onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}
-                className="text-[10px] bg-primary/5 hover:bg-primary/10 px-2 py-1 rounded-full text-primary/90 transition-colors"
+                className="text-[10px] bg-background hover:bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground border border-border/30 transition-colors"
+                aria-label="חזרה למעלה"
               >
-                חזרה למעלה
+                ↑
               </button>
             </div>
           </div>
         </header>
         
-        {/* Normal Header - only shows when not scrolled */}
-        <header className={`app-header mb-8 text-center transition-all duration-500 ${
-          isHeaderSticky ? 'opacity-0 transform translate-y-[-10px]' : 'opacity-100 transform translate-y-0'
+        {/* Main Header - only shows when not scrolled */}
+        <header className={`app-header mb-5 ${
+          isHeaderSticky ? 'opacity-0 transform translate-y-[-8px] pointer-events-none' : 'opacity-100 transform translate-y-0'
         }`}>
-          <div className="flex flex-col items-center gap-3 mb-3">
-            <div className="relative">
-              <img 
-                src="/icons/icon-72x72.png" 
-                alt="תור רם-אל"
-                className="w-16 h-16 rounded-2xl shadow-lg"
-              />
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-white/20 to-transparent dark:from-black/20"></div>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <img 
+                  src="/icons/icon-72x72.png" 
+                  alt="תור רם-אל"
+                  className="w-11 h-11 rounded-xl shadow-sm"
+                />
+                <div className="absolute inset-0 rounded-xl bg-gradient-to-tr from-white/20 to-transparent dark:from-black/20"></div>
+              </div>
+              
+              <div>
+                <h1 className="text-lg font-bold mb-0.5 leading-none">
+                  תורים לרם-אל
+                </h1>
+                <p className="text-xs text-muted-foreground">בדיקת תורים וקבלת התראות</p>
+              </div>
             </div>
             
-            <div className="text-center">
-              <h1 className="text-2xl font-bold mb-0.5 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                תורים לרם-אל
-              </h1>
-              <p className="text-sm text-muted-foreground/80">בדיקת תורים פנויים וקבלת התראות</p>
-            </div>
+            <ThemeToggle className="w-7 h-7" />
           </div>
           
-          <div className="relative">
-            <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent mt-4"></div>
-            <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-background p-1 rounded-full">
-              <ThemeToggle />
-            </div>
-          </div>
+          <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent mb-3"></div>
         </header>
         
         {/* Cached Results Component */}
