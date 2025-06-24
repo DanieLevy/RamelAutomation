@@ -90,6 +90,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Get appointments data from request or fetch from cache
     let appointments: AppointmentResult[] = [];
+    const isTestMode = req.body?.testMode === true; // Test mode bypasses rate limiting
     
     if (req.body && req.body.appointments) {
       appointments = req.body.appointments;
@@ -172,10 +173,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             continue;
           }
 
+          // Fetch fresh notification data to avoid stale counts in test mode
+          let currentNotification = notification;
+          if (isTestMode) {
+            const { data: freshNotification } = await supabase
+              .from('notifications')
+              .select('*')
+              .eq('id', notification.id)
+              .single();
+            currentNotification = freshNotification || notification;
+          }
+          
           // Check notification constraints
-          const currentNotifCount = notification.notification_count || 0;
+          const currentNotifCount = currentNotification.notification_count || 0;
           const now = new Date();
-          const lastNotified = notification.last_notified ? new Date(notification.last_notified) : null;
+          const lastNotified = currentNotification.last_notified ? new Date(currentNotification.last_notified) : null;
           const timeSinceLastNotification = lastNotified ? now.getTime() - lastNotified.getTime() : Infinity;
 
           // Skip if max emails reached
@@ -184,56 +196,101 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               .from('notifications')
               .update({ status: 'max_reached', updated_at: new Date().toISOString() })
               .eq('id', notification.id);
-            console.log(`📧 Max emails reached for ${notification.email}`);
+            console.log(`📧 Max emails reached for ${notification.email} - marking as max_reached`);
             emailsSkipped++;
             continue;
           }
+          
+          if (isTestMode) {
+            console.log(`📧 🧪 TEST: Processing email for ${currentNotification.email}, current count: ${currentNotifCount}, will be: ${currentNotifCount + 1}`);
+          }
 
-          // Skip if too soon since last notification (10 minutes minimum)
-          if (timeSinceLastNotification < 10 * 60 * 1000) {
+          // Skip if too soon since last notification (10 minutes minimum) - unless in test mode
+          if (!isTestMode && timeSinceLastNotification < 10 * 60 * 1000) {
             console.log(`📧 Too soon for ${notification.email} (${Math.round(timeSinceLastNotification / 60000)}m ago)`);
             emailsSkipped++;
             continue;
+          }
+          
+          if (isTestMode && timeSinceLastNotification < 10 * 60 * 1000) {
+            console.log(`📧 🧪 TEST MODE: Bypassing rate limit for ${notification.email}`);
           }
 
           // Generate modern email content using the new template system
           const emailContent = generateModernEmailTemplate({
             matchingResults,
             notificationCount: currentNotifCount,
-            unsubscribeUrl: `https://tor-ramel.netlify.app/unsubscribe?token=${notification.unsubscribe_token}`,
-            userEmail: notification.email,
-            criteriaType: notification.criteria_type as 'single' | 'range'
+            unsubscribeUrl: `https://tor-ramel.netlify.app/unsubscribe?token=${currentNotification.unsubscribe_token}`,
+            userEmail: currentNotification.email,
+            criteriaType: currentNotification.criteria_type as 'single' | 'range'
           });
 
           const mailOptions = {
             from: `"תורים לרם-אל" <${process.env.EMAIL_SENDER}>`,
-            to: notification.email,
+            to: currentNotification.email,
             subject: emailContent.subject,
             text: emailContent.text,
             html: emailContent.html
           };
 
-          // Add to batch promises
+          // Add to batch promises with robust error handling
           emailPromises.push(
-            transporter.sendMail(mailOptions)
-              .then(async () => {
-                // Update notification record
-                await supabase
+            (async () => {
+              try {
+                console.log(`📧 Sending email #${currentNotifCount + 1}/6 to ${currentNotification.email}`);
+                
+                // Send email
+                const emailResult = await transporter.sendMail(mailOptions);
+                console.log(`📧 ✅ Email sent successfully: ${emailResult.messageId}`);
+                
+                // Calculate new values
+                const newNotificationCount = currentNotifCount + 1;
+                const newStatus = newNotificationCount >= 6 ? 'max_reached' : 'active';
+                
+                // Update notification record with proper transaction handling
+                const { error: updateError } = await supabase
                   .from('notifications')
                   .update({
                     last_notified: new Date().toISOString(),
-                    notification_count: (notification.notification_count || 0) + 1,
+                    notification_count: newNotificationCount,
+                    status: newStatus,
                     updated_at: new Date().toISOString()
                   })
-                  .eq('id', notification.id);
+                  .eq('id', currentNotification.id);
                 
-                console.log(`📧 ✅ Sent email #${(notification.notification_count || 0) + 1} to ${notification.email}`);
-                emailsSent++;
-              })
-              .catch(error => {
-                console.error(`📧 ❌ Failed to send email to ${notification.email}:`, error.message);
-                throw error;
-              })
+                if (updateError) {
+                  console.error(`📧 ❌ Failed to update notification record for ${currentNotification.email}:`, updateError);
+                  throw new Error(`Database update failed: ${updateError.message}`);
+                }
+                
+                console.log(`📧 ✅ Sent email #${newNotificationCount} to ${currentNotification.email} (status: ${newStatus})`);
+                
+                if (newStatus === 'max_reached') {
+                  console.log(`🏁 Notification completed for ${currentNotification.email} - 6 emails sent`);
+                }
+                
+                return { success: true, email: currentNotification.email, count: newNotificationCount, status: newStatus };
+                
+                              } catch (error: any) {
+                console.error(`📧 ❌ Failed to send/update email for ${currentNotification.email}:`, error.message);
+                
+                // Update error count
+                try {
+                  await supabase
+                    .from('notifications')
+                    .update({
+                      error_count: (currentNotification.error_count || 0) + 1,
+                      last_error: error.message,
+                      updated_at: new Date().toISOString()
+                    })
+                    .eq('id', currentNotification.id);
+                } catch (dbError) {
+                  console.error(`📧 ❌ Failed to update error count for ${currentNotification.id}:`, dbError);
+                }
+                
+                return { success: false, email: currentNotification.email, error: error.message };
+              }
+            })()
           );
 
         } catch (error) {
@@ -242,9 +299,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
 
-      // Execute batch of emails
+      // Execute batch of emails with proper result handling
       if (emailPromises.length > 0) {
-        await Promise.allSettled(emailPromises);
+        const results = await Promise.allSettled(emailPromises);
+        
+        // Process results to update counters
+        results.forEach((result, index) => {
+          if (result.status === 'fulfilled') {
+            const emailResult = result.value;
+            if (emailResult.success) {
+              emailsSent++;
+              console.log(`📧 ✅ Batch result: ${emailResult.email} - email #${emailResult.count} (${emailResult.status})`);
+            } else {
+              emailsSkipped++;
+              console.log(`📧 ❌ Batch result: ${emailResult.email} - failed: ${emailResult.error}`);
+            }
+          } else {
+            emailsSkipped++;
+            console.log(`📧 ❌ Batch promise rejected:`, result.reason);
+          }
+        });
         
         // Rate limiting: small delay between batches
         if (i + BATCH_SIZE < notifications.length) {

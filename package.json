@@ -13,7 +13,8 @@
     "deploy:test": "netlify deploy",
     "deploy:prod": "netlify deploy --prod",
     "test:emails": "node scripts/test-emails.js",
-    "test:comprehensive": "node scripts/comprehensive-test.js"
+    "test:comprehensive": "node scripts/comprehensive-test.js",
+    "test:email-system": "node scripts/test-fixed-email-system.js"
   },
   "dependencies": {
     "@netlify/functions": "^4.1.6",

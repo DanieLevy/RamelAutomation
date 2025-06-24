@@ -5,6 +5,9 @@ const nodemailer = require('nodemailer')
 const http = require('http')
 const https = require('https')
 
+// For Node.js environments that don't have fetch built-in
+const fetch = global.fetch || require('node-fetch')
+
 // ============================================================================
 // ULTRA-OPTIMIZED AUTO-CHECK FUNCTION
 // Target: Complete execution under 8 seconds (2s buffer from 10s limit)
@@ -341,8 +344,40 @@ exports.handler = async (event, context) => {
     const totalTime = Math.round((Date.now() - functionStart) / 1000)
     console.log(`⚡ FUNCTION COMPLETED in ${totalTime}s (target: <8s)`)
     
-    // TRIGGER EMAIL PROCESSING: Signal frontend to handle emails
-    const shouldTriggerEmails = appointmentResults.found && appointmentResults.appointments.length > 0
+    // TRIGGER EMAIL PROCESSING: Actually process emails if appointments found
+    let emailProcessingResult = null;
+    const shouldTriggerEmails = appointmentResults.found && appointmentResults.appointments.length > 0;
+    
+    if (shouldTriggerEmails) {
+      console.log(`📧 Found ${appointmentResults.appointments.length} appointments - triggering email processing`);
+      
+      try {
+        // Call the email processing API directly
+        const emailApiUrl = process.env.DEPLOY_URL || 'https://tor-ramel.netlify.app';
+        const response = await fetch(`${emailApiUrl}/api/process-notifications`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            appointments: appointmentResults.appointments
+          })
+        });
+
+        if (response.ok) {
+          emailProcessingResult = await response.json();
+          console.log(`📧 ✅ Email processing completed: ${emailProcessingResult.emailsSent} sent, ${emailProcessingResult.emailsSkipped} skipped`);
+        } else {
+          console.error(`📧 ❌ Email processing failed with status: ${response.status}`);
+          emailProcessingResult = { error: `HTTP ${response.status}` };
+        }
+      } catch (emailError) {
+        console.error(`📧 ❌ Email processing error:`, emailError.message);
+        emailProcessingResult = { error: emailError.message };
+      }
+    } else {
+      console.log('📧 No appointments found - skipping email processing');
+    }
     
     return {
       statusCode: 200,
@@ -358,9 +393,8 @@ exports.handler = async (event, context) => {
           found: appointmentResults.found,
           appointmentCount: appointmentResults.appointments.length,
           summary: appointmentResults.summary,
-          // Return trigger signal for frontend email processing
-          triggerEmails: shouldTriggerEmails,
-          appointments: appointmentResults.appointments
+          appointments: appointmentResults.appointments,
+          emailProcessing: emailProcessingResult
         },
         meta: {
           cacheKey: 'auto-check-minimal',
