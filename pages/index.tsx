@@ -8,6 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Calendar as CalendarIcon, Clock, Search, Smartphone, Wifi, WifiOff, Share2, Copy, Download, MapPin, ExternalLink } from 'lucide-react';
 import PWABanner from '../components/PWABanner';
+import CachedResults from '../components/CachedResults';
+import NotificationSubscribe from '../components/NotificationSubscribe';
+import ManualSearch from '../components/ManualSearch';
 import { DatePicker, DateRangePicker } from '@/components/ui/date-picker';
 import { createClient } from '@supabase/supabase-js';
 import { format, parseISO, addDays } from 'date-fns';
@@ -147,7 +150,7 @@ export default function Home() {
   const [cachedResult, setCachedResult] = useState<any>(null)
   const [loadingCached, setLoadingCached] = useState(true)
   const [days, setDays] = useState(7)
-  const [searchMode, setSearchMode] = useState<'range' | 'closest'>('closest')
+  const [searchMode, setSearchMode] = useState<'range' | 'closest'>('range')
   const [isOnline, setIsOnline] = useState(true)
   const [canInstall, setCanInstall] = useState(false)
   const [installPrompt, setInstallPrompt] = useState<any>(null)
@@ -160,6 +163,9 @@ export default function Home() {
   const [notifyEmail, setNotifyEmail] = useState('')
   const [notifyDate, setNotifyDate] = useState<Date | undefined>(undefined)
   const [notifyDateRange, setNotifyDateRange] = useState<{from?: Date, to?: Date}>({from: undefined, to: undefined})
+
+  // State for sticky header
+  const [isHeaderSticky, setIsHeaderSticky] = useState(false)
 
   useEffect(() => {
     // Check online status
@@ -643,13 +649,35 @@ ${availableResults.length} תאריכים זמינים
     }
   }
 
+  useEffect(() => {
+    // Check if online
+    setIsOnline(navigator.onLine)
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    
+    // Scroll event for sticky header
+    const handleScroll = () => {
+      const scrollPosition = window.scrollY
+      setIsHeaderSticky(scrollPosition > 100) // Show sticky header after scrolling 100px
+    }
+    window.addEventListener('scroll', handleScroll)
+    
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+      window.removeEventListener('scroll', handleScroll)
+    }
+  }, [])
+
   return (
     <div className="bg-background min-h-screen">
       <Head>
         <title>תורים לרם-אל | בדיקת תורים פנויים</title>
         <meta name="description" content="בדיקת תורים פנויים למספרת רם-אל" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-        <meta name="theme-color" content="#ffffff" />
+        <meta name="theme-color" content="#3b82f6" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <link rel="icon" href="/favicon.ico" />
@@ -664,434 +692,125 @@ ${availableResults.length} תאריכים זמינים
         />
       )}
 
-      <div className="page-container mx-auto px-4 py-6 max-w-screen-sm">
-        {/* App Header */}
-        <header className="app-header mb-8">
-          <h1 className="text-2xl font-bold text-center mb-1">תורים למספרה רם-אל</h1>
-          <p className="text-muted-foreground text-center text-sm">בדיקת תורים פנויים וקבלת התראות</p>
-          
-          <div className="mt-2 flex items-center justify-center gap-1.5 text-xs">
-            {isOnline ? (
-              <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
-                <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
-                <span>מחובר</span>
+      <div className={`page-container mx-auto px-4 py-6 max-w-screen-sm transition-all duration-300 ${
+        isHeaderSticky ? 'pt-16' : 'pt-6'
+      }`} dir="rtl">
+        {/* Sticky Header - shows when scrolling */}
+        <header 
+          className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 transform ${
+            isHeaderSticky 
+              ? 'translate-y-0 opacity-100' 
+              : 'translate-y-[-100%] opacity-0'
+          }`}
+        >
+          <div className="max-w-screen-sm mx-auto px-4 py-2 backdrop-blur-lg bg-background/70 border-b border-border/30 shadow-sm flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <img 
+                  src="/icons/icon-72x72.png" 
+                  alt="תור רם-אל"
+                  className="w-8 h-8 rounded-lg shadow-sm"
+                />
+                <div className="absolute inset-0 rounded-lg bg-gradient-to-tr from-white/10 to-transparent"></div>
               </div>
-            ) : (
-              <div className="flex items-center gap-1 text-red-600 dark:text-red-400">
-                <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
-                <span>לא מחובר</span>
-              </div>
-            )}
+              <h2 className="text-sm font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                תורים לרם-אל
+              </h2>
+            </div>
+            
+            <button
+              onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}
+              className="text-[10px] bg-primary/5 hover:bg-primary/10 px-2 py-1 rounded-full text-primary/90 transition-colors"
+            >
+              חזרה למעלה
+            </button>
           </div>
         </header>
         
-        {/* Cached Results */}
-        {loadingCached ? (
-          <div className="card-modern p-0 overflow-hidden mb-6">
-            <div className="h-20 animate-pulse bg-muted"></div>
+        {/* Normal Header - only shows when not scrolled */}
+        <header className={`app-header mb-8 text-center transition-all duration-500 ${
+          isHeaderSticky ? 'opacity-0 transform translate-y-[-10px]' : 'opacity-100 transform translate-y-0'
+        }`}>
+          <div className="flex flex-col items-center gap-3 mb-3">
+            <div className="relative">
+            <img 
+              src="/icons/icon-72x72.png" 
+              alt="תור רם-אל"
+                className="w-16 h-16 rounded-2xl shadow-lg backdrop-blur-sm"
+            />
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-white/20 to-transparent"></div>
+            </div>
+            
+            <div className="text-center">
+              <h1 className="text-2xl font-bold mb-0.5 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                תורים לרם-אל
+              </h1>
+              <p className="text-sm text-muted-foreground/80">בדיקת תורים פנויים וקבלת התראות</p>
+            </div>
           </div>
-        ) : cachedResult && cachedResult.summary?.hasAvailable ? (
-          <Card className="mb-6">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <Badge className="bg-[hsl(var(--success))] text-[hsl(var(--success-foreground))]">
-                  תורים זמינים
-                </Badge>
-                <CardTitle className="text-right text-base">תוצאות עדכניות</CardTitle>
-              </div>
-              <CardDescription className="text-right">
-                עודכן לפני {cachedResult.updatedTimeAgo}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4">
-              <div className="space-y-4">
-                {cachedResult.results.filter((r: any) => r.available === true).map((result: any, idx: number) => (
-                  <div key={idx} className="border rounded-lg p-3 pb-5 text-right">
-                    <div className="flex justify-between items-start mb-3">
-                      <Badge variant="outline" className="bg-[hsl(var(--accent))] border-none text-xs">
-                        {result.times.length} זמנים
-                      </Badge>
-                      <div>
-                        <div className="font-medium">
-                          {formatDisplayDateIsrael(result.date)}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {getDayNameHebrew(result.date)}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-1 justify-end mb-3">
-                      {result.times.map((time: string, timeIdx: number) => (
-                        <span key={timeIdx} className="px-2 py-0.5 rounded-full bg-[hsl(var(--accent))] text-accent-foreground text-xs font-medium">
-                          {formatTimeIsrael(time)}
-                        </span>
-                      ))}
-                    </div>
-                    <div className="flex justify-end">
-                      <Button
-                        onClick={() => window.open(generateBookingUrl(result.date), '_blank')}
-                        size="sm"
-                        className="ml-auto"
-                      >
-                        קבע תור
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        ) : cachedResult ? (
-          <Card className="mb-6">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <Badge variant="outline" className="bg-muted text-muted-foreground">
-                  אין תורים
-                </Badge>
-                <CardTitle className="text-right text-base">אין תורים זמינים</CardTitle>
-              </div>
-              <CardDescription className="text-right">
-                עודכן לפני {cachedResult.updatedTimeAgo}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-center text-muted-foreground py-2">
-                לא נמצאו תורים זמינים בבדיקה האחרונה
-              </p>
-            </CardContent>
-          </Card>
-        ) : null}
-
-        {/* Notification Form */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-right">קבל התראה כשמתפנה תור</CardTitle>
-            <CardDescription className="text-right">
-              נשלח לך מייל ברגע שמתפנה תור המתאים לבחירתך
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleNotifySubmit} className="stack-sm">
-              {/* Email Field with Visual Indicator */}
-              <div className="form-group">
-                <label htmlFor="email-input" className="block text-sm font-medium text-right mb-1">
-                  כתובת מייל
-                </label>
-                <div className="relative">
-                  <input
-                    id="email-input"
-                    type="email"
-                    name="email"
-                    value={notifyEmail}
-                    onChange={e => setNotifyEmail(e.target.value)}
-                    placeholder="example@gmail.com"
-                    className="w-full input-modern pr-10"
-                    required
-                    dir="ltr"
-                  />
-                  {notifyEmail.includes('@') && (
-                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-500">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-check">
-                        <polyline points="20 6 9 17 4 12"></polyline>
-                      </svg>
-                    </span>
-                  )}
-                </div>
-                <span className="text-xs text-muted-foreground block text-right mt-1">
-                  יישלח מייל כאשר מתפנה תור
-                </span>
-              </div>
-              
-              {/* Date Selection Type Toggle */}
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-right mb-2">
-                  סוג בחירת תאריכים
-                </label>
-                <div className="flex gap-2">
-                  <Button 
-                    type="button"
-                    variant={notifyType === 'single' ? "default" : "outline"}
-                    className="flex-1"
-                    onClick={() => setNotifyType('single')}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-2">
-                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                      <line x1="16" y1="2" x2="16" y2="6"></line>
-                      <line x1="8" y1="2" x2="8" y2="6"></line>
-                      <line x1="3" y1="10" x2="21" y2="10"></line>
-                      <rect x="9" y="14" width="4" height="4"></rect>
-                    </svg>
-                    יום בודד
-                  </Button>
-                  <Button 
-                    type="button"
-                    variant={notifyType === 'range' ? "default" : "outline"}
-                    className="flex-1"
-                    onClick={() => setNotifyType('range')}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-2">
-                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                      <line x1="16" y1="2" x2="16" y2="6"></line>
-                      <line x1="8" y1="2" x2="8" y2="6"></line>
-                      <line x1="3" y1="10" x2="21" y2="10"></line>
-                      <rect x="8" y="14" width="2" height="2"></rect>
-                      <rect x="14" y="14" width="2" height="2"></rect>
-                    </svg>
-                    טווח תאריכים
-                  </Button>
-                </div>
-              </div>
-              
-              {/* Date Picker with Smart Selection Indicator */}
-              <div className="mt-3">
-                <label className="block text-sm font-medium text-right mb-2">
-                  {notifyType === 'single' ? 'בחר תאריך' : 'בחר טווח תאריכים'}
-                </label>
-                {notifyType === 'single' ? (
-                  <DatePicker 
-                    date={notifyDate}
-                    onDateChange={setNotifyDate}
-                    placeholder="בחר תאריך"
-                  />
-                ) : (
-                  <>
-                    <DateRangePicker
-                      dateRange={notifyDateRange}
-                      onDateRangeChange={setNotifyDateRange}
-                      placeholder="בחר טווח תאריכים"
-                    />
-                    {notifyDateRange.from && notifyDateRange.to && (
-                      <div className="flex items-center bg-muted rounded-md px-3 py-1 mt-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-2">
-                          <path d="M12 22c5.5 0 10-4.5 10-10S17.5 2 12 2 2 6.5 2 12s4.5 10 10 10z"></path>
-                          <path d="M12 8v4l3 3"></path>
-                        </svg>
-                        <span className="text-xs text-muted-foreground">
-                          חיפוש חכם - המערכת מאתרת מועד בטווח שבחרת
-                        </span>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-              
-              {/* Submit Button with Visual Feedback */}
-              <Button
-                type="submit"
-                className="w-full mt-4"
-                disabled={notifyLoading}
-                size="lg"
-              >
-                {notifyLoading ? (
-                  <>
-                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
-                    <span>נרשם להתראות...</span>
-                  </>
-                ) : (
-                  <>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-2">
-                      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path>
-                      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path>
-                    </svg>
-                    הרשם להתראה
-                  </>
-                )}
-              </Button>
-              
-              {/* Status Message with Visual Indicator */}
-              {notifyStatus && (
-                <div className={`text-sm text-center mt-3 p-2 rounded-md ${notifyStatus.startsWith('✓') ? 'bg-[hsl(var(--success)/10%)] text-[hsl(var(--success))]' : 'bg-[hsl(var(--destructive)/10%)] text-[hsl(var(--destructive))]'}`}>
-                  {notifyStatus}
-                </div>
-              )}
-            </form>
-          </CardContent>
-          <CardFooter className="flex justify-end border-t pt-4 text-xs text-muted-foreground">
-            <div className="flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-1">
-                <path d="M12 22c5.5 0 10-4.5 10-10S17.5 2 12 2 2 6.5 2 12s4.5 10 10 10z"></path>
-                <path d="m9 12 2 2 4-4"></path>
-              </svg>
-              ההתראות ימשיכו להישלח עד לקביעת תור
-            </div>
-          </CardFooter>
-        </Card>
-
-        {/* Search Controls */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-right">חיפוש תורים</CardTitle>
-            <CardDescription className="text-right">
-              חפש תורים זמינים בזמן אמת
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="stack-sm">
-            <div className="flex gap-2">
-              <Button
-                variant={searchMode === 'closest' ? 'default' : 'outline'}
-                onClick={() => setSearchMode('closest')}
-                className="flex-1"
-              >
-                הקרוב ביותר
-              </Button>
-              <Button
-                variant={searchMode === 'range' ? 'default' : 'outline'}
-                onClick={() => setSearchMode('range')}
-                className="flex-1"
-              >
-                טווח ימים
-              </Button>
-            </div>
-            
-            <div className="text-xs text-muted-foreground text-center mt-1">
-              {searchMode === 'range' 
-                ? `בדיקת ${days} ימים קדימה (ללא ימי שני ושבת)`
-                : 'חיפוש התור הפנוי הקרוב ביותר (עד 30 ימים)'}
-            </div>
-            
-            {searchMode === 'range' && (
-              <Select value={days.toString()} onValueChange={value => setDays(parseInt(value))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="בחר מספר ימים" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="3">3 ימים</SelectItem>
-                  <SelectItem value="7">7 ימים</SelectItem>
-                  <SelectItem value="14">14 ימים</SelectItem>
-                  <SelectItem value="21">21 ימים</SelectItem>
-                  <SelectItem value="30">30 ימים</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-          </CardContent>
-          <CardFooter>
-            <Button
-              onClick={checkAppointments}
-              disabled={loading}
-              className="w-full h-12 text-base font-medium"
-              size="lg"
-            >
-              {loading ? (
-                <div className="flex items-center gap-2">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  <span>{searchMode === 'closest' ? 'מחפש תור...' : 'בודק תורים...'}</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <Search className="h-5 w-5" />
-                  <span>{searchMode === 'closest' ? 'חפש תור קרוב' : 'בדוק תורים'}</span>
-                </div>
-              )}
-            </Button>
-          </CardFooter>
-        </Card>
+          
+          <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent mt-4"></div>
+        </header>
         
-        {/* Manual Search Results */}
-        {results.length > 0 && (
-          <Card className="mb-6">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                {results.filter(r => r.available === true).length > 0 && (
-                  <Button 
-                    onClick={handleShare}
-                    size="sm"
-                    variant="outline"
-                  >
-                    <Share2 className="h-4 w-4 ml-1" />
-                    שתף
-                  </Button>
-                )}
-                <CardTitle className="text-right">תוצאות חיפוש</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {results.filter(r => r.available === true).length > 0 ? (
-                <div className="space-y-4">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[hsl(var(--success)/20%)] text-[hsl(var(--success))] text-xs">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--success))]"></div>
-                    נמצאו {results.filter(r => r.available === true).length} תורים זמינים
-                  </div>
-                  
-                  {searchMode === 'closest' && results.filter(r => r.available === true).length > 0 ? (
-                    // Closest mode - show only the first available appointment
-                    <div className="flex flex-col items-center text-center gap-3 py-2">
-                      <div className="text-xl font-medium text-primary leading-tight">
-                        {formatDisplayDateIsrael(results[0].date)}
-                      </div>
-                      <div className="text-muted-foreground text-sm">
-                        {getDayNameHebrew(results[0].date)}
-                      </div>
-                      <div className="flex flex-wrap gap-1 justify-center">
-                        {results[0].times.map((time, timeIdx) => (
-                          <Badge key={timeIdx} variant="outline" className="bg-[hsl(var(--accent))]">
-                            {formatTimeIsrael(time)}
-                          </Badge>
-                        ))}
-                      </div>
-                      <Button
-                        onClick={() => window.open(generateBookingUrl(results[0].date), '_blank')}
-                        className="w-full mt-2"
-                      >
-                        קבע תור עכשיו
-                      </Button>
-                    </div>
-                  ) : (
-                    // Range mode - show all available dates
-                    <div className="space-y-4">
-                      {results.filter(r => r.available === true).map((result, idx) => (
-                        <div key={idx} className="border rounded-lg p-3 text-right">
-                          <div className="flex justify-between items-start mb-2">
-                            <Badge variant="outline" className="bg-[hsl(var(--accent))] border-none">
-                              {result.times.length} זמנים
-                            </Badge>
-                            <div>
-                              <div className="font-medium">
-                                {formatDisplayDateIsrael(result.date)}
-                              </div>
-                              <div className="text-sm text-muted-foreground">
-                                {getDayNameHebrew(result.date)}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex flex-wrap gap-1 justify-end mb-3">
-                            {result.times.map((time, timeIdx) => (
-                              <span key={timeIdx} className="px-2 py-0.5 rounded-full bg-[hsl(var(--accent))] text-accent-foreground text-xs font-medium">
-                                {formatTimeIsrael(time)}
-                              </span>
-                            ))}
-                          </div>
-                          <Button
-                            onClick={() => window.open(generateBookingUrl(result.date), '_blank')}
-                            size="sm"
-                            className="w-full"
-                          >
-                            קבע תור
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : results.some(r => r.available === null) ? (
-                <div className="text-center py-6">
-                  <div className="text-destructive mb-2">שגיאה בבדיקת התורים</div>
-                  <div className="text-sm text-muted-foreground">אנא נסה שוב מאוחר יותר</div>
-                </div>
-              ) : (
-                <div className="text-center py-6">
-                  <div className="text-primary mb-2">לא נמצאו תורים פנויים</div>
-                  <div className="text-sm text-muted-foreground">נסה תאריכים אחרים או בדוק מאוחר יותר</div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+        {/* Cached Results Component */}
+        <CachedResults
+          loading={loadingCached}
+          cachedResult={cachedResult}
+          onCheckAppointments={checkAppointments}
+          formatDisplayDateIsrael={formatDisplayDateIsrael}
+          getDayNameHebrew={getDayNameHebrew}
+          formatTimeIsrael={formatTimeIsrael}
+          generateBookingUrl={generateBookingUrl}
+        />
+
+        {/* Notification Subscribe Component */}
+        <NotificationSubscribe
+          notifyEmail={notifyEmail}
+          setNotifyEmail={setNotifyEmail}
+          notifyType={notifyType}
+          setNotifyType={setNotifyType}
+          notifyDate={notifyDate}
+          setNotifyDate={setNotifyDate}
+          notifyDateRange={notifyDateRange}
+          setNotifyDateRange={setNotifyDateRange}
+          notifyLoading={notifyLoading}
+          notifyStatus={notifyStatus}
+          onSubmit={handleNotifySubmit}
+        />
+
+        {/* Manual Search Component */}
+        <ManualSearch
+          searchMode={searchMode}
+          setSearchMode={setSearchMode}
+          days={days}
+          setDays={setDays}
+          loading={loading}
+          results={results}
+          onCheckAppointments={checkAppointments}
+          onShare={handleShare}
+          formatDisplayDateIsrael={formatDisplayDateIsrael}
+          getDayNameHebrew={getDayNameHebrew}
+          formatTimeIsrael={formatTimeIsrael}
+          generateBookingUrl={generateBookingUrl}
+        />
         
         {/* Footer */}
-        <footer className="mt-8 text-center text-xs text-muted-foreground">
-          <p>פותח בידי דניאל פנחס &copy; {new Date().getFullYear()}</p>
-          <p className="mt-1">בדיקת תורים למספרת רם-אל</p>
-        </footer>
+        <div className="mt-8 mb-4 opacity-80 hover:opacity-100 transition-opacity">
+          <div className="flex flex-col items-center justify-center gap-1">
+            <p className="text-xs text-center flex items-center gap-1.5">
+              פותח ב
+              <span className="inline-block text-primary animate-pulse" role="img" aria-label="heart">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                  <path d="M11.645 20.91l-.007-.003-.022-.012a15.247 15.247 0 01-.383-.218 25.18 25.18 0 01-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0112 5.052 5.5 5.5 0 0116.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 01-4.244 3.17 15.247 15.247 0 01-.383.219l-.022.012-.007.004-.003.001a.752.752 0 01-.704 0l-.003-.001z" />
+                </svg>
+              </span>
+              על ידי דניאל לוי
+            </p>
+            <p className="text-[10px] text-muted-foreground/60">
+              {new Date().getFullYear()} © כל הזכויות שמורות
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   )

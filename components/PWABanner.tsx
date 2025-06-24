@@ -30,76 +30,58 @@ export default function PWABanner({ onInstall, onDismiss, ios = false, canInstal
   }
 
   return (
-    <div className={`fixed bottom-0 left-0 right-0 z-50 transform transition-all duration-300 ease-out ${
+    <div className={`fixed bottom-0 left-0 right-0 z-50 p-4 bg-gradient-to-t from-background via-background/95 to-transparent backdrop-blur-sm border-t border-primary/20 ${
       isVisible ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'
     }`}>
-      <div className="mx-4 mb-4">
-        <div className="relative overflow-hidden rounded-2xl bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border border-gray-200/50 dark:border-gray-700/50 shadow-2xl">
-          {/* Gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-pink-500/5"></div>
-          
-          <div className="relative p-4">
-            <div className="flex items-center gap-3">
-              {/* App Icon */}
-              <div className="flex-shrink-0">
-                <div className="relative">
-                  <img 
-                    src="/icons/icon-72x72.png" 
-                    alt="תור רם-אל"
-                    className="w-12 h-12 rounded-xl shadow-lg"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.src = '/favicon-32x32.png';
-                    }}
-                  />
-                  <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-white/20 to-transparent"></div>
-                </div>
-              </div>
-
-              {/* Content */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="font-medium text-gray-900 dark:text-white text-base">
-                    תור רם-אל
-                  </h3>
-                  <div className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-medium">
-                    התקן
-                  </div>
-                </div>
-                
-                {ios ? (
-                  <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
-                    לחץ על <Share className="inline w-4 h-4 mx-1" /> ובחר <strong>"הוסף למסך הבית"</strong>
-                  </p>
-                ) : (
-                  <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
-                    התקן לגישה מהירה ללא דפדפן
-                  </p>
-                )}
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {/* Install Button (not for iOS) */}
-                {!ios && (
-                  <button
-                    onClick={handleInstall}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 active:scale-95"
-                  >
-                    <Plus className="w-4 h-4" />
-                    התקן
-                  </button>
-                )}
-
-                {/* Close Button */}
-                <button
-                  onClick={handleDismiss}
-                  className="flex items-center justify-center w-9 h-9 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all duration-200 active:scale-95"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+      <div className="max-w-sm mx-auto bg-card/95 backdrop-blur-md rounded-2xl shadow-2xl border border-primary/20 overflow-hidden">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-secondary to-accent"></div>
+        
+        <div className="p-4">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="relative flex-shrink-0">
+              <img 
+                src="/icons/icon-72x72.png" 
+                alt="תור רם-אל"
+                className="w-12 h-12 rounded-xl shadow-md"
+                style={{ imageRendering: 'crisp-edges' }}
+              />
             </div>
+            
+            <div className="flex-1 min-w-0">
+              <h3 className="font-bold text-sm text-foreground leading-tight">
+                תור רם-אל
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                התקן את האפליקציה לחוויה מהירה יותר
+              </p>
+            </div>
+            
+            <button
+              onClick={handleDismiss}
+              className="flex-shrink-0 p-1 rounded-full hover:bg-muted/50 transition-colors"
+              aria-label="סגור"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+          
+          <div className="flex gap-2">
+            <button
+              onClick={handleDismiss}
+              className="flex-1 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-muted/50"
+            >
+              לא תודה
+            </button>
+            <button
+              onClick={handleInstall}
+              disabled={!canInstall}
+              className="flex-1 px-3 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+            >
+              התקן
+            </button>
           </div>
         </div>
       </div>

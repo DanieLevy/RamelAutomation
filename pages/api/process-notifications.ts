@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
+import { generateModernEmailTemplate } from '@/lib/emailTemplates';
 
 // ============================================================================
 // EMAIL NOTIFICATION PROCESSOR
@@ -195,141 +196,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             continue;
           }
 
-          // Generate personalized email content
-          const notifCount = currentNotifCount;
-          let subject = 'תור פנוי במספרת רם-אל!';
-
-          // Smart subject line based on notification count
-          if (notifCount === 0) {
-            subject = `תור פנוי נמצא! 🎉`;
-          } else if (notifCount === 1) {
-            subject = `תזכורת: תור פנוי עדיין זמין`;
-          } else if (notifCount >= 2) {
-            subject = `פעולה נדרשת: תורים פנויים עלולים להתמלא בקרוב`;
-          }
-
-          if (notifCount >= 3) {
-            subject = `🚨 ${subject}`;
-          }
-
-          const unsubscribeUrl = `https://tor-ramel.netlify.app/unsubscribe?token=${notification.unsubscribe_token}`;
-
-          // Generate appointment cards for email
-          const appointmentCards = matchingResults.map(appointment => `
-            <div style="margin-bottom: 20px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; background-color: #f9fafb;">
-              <div style="text-align: center; margin-bottom: 12px;">
-                <div style="background-color: #f3f4f6; border-radius: 16px; padding: 8px 16px; font-weight: bold; font-size: 18px; display: inline-block; margin-bottom: 8px; color: #111827;">
-                  ${appointment.date}
-                </div>
-                <div style="font-size: 16px; color: #4b5563;">${getDayNameHebrew(appointment.date)}</div>
-              </div>
-              
-              <div style="display: flex; align-items: center; justify-content: center; margin: 12px 0;">
-                <span style="color: #10b981; font-weight: 500;">תורים זמינים: ${appointment.times.length}</span>
-                <div style="width: 8px; height: 8px; border-radius: 50%; background-color: #10b981; margin-right: 8px;"></div>
-              </div>
-              
-              <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 16px 0;">
-                ${appointment.times.map(time => `
-                  <span style="background-color: #e5e7eb; color: #111827; border-radius: 16px; padding: 6px 12px; font-size: 14px; font-weight: 500;">${time}</span>
-                `).join('')}
-              </div>
-              
-              <div style="text-align: center;">
-                <a href="${generateBookingUrl(appointment.date)}" style="display: inline-block; background-color: #000000; color: white; text-decoration: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; margin-top: 8px;" target="_blank">
-                  קבע תור ל-${appointment.date}
-                </a>
-              </div>
-            </div>
-          `).join('');
-
-          // Mobile-optimized email HTML
-          const emailHtml = `
-          <!DOCTYPE html>
-          <html dir="rtl" lang="he">
-            <head>
-              <meta charset="utf-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <title>תורים פנויים במספרת רם-אל</title>
-              <style>
-                body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; width: 100%; background-color: #f9fafb; line-height: 1.6; }
-                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                .card { background-color: white; border-radius: 12px; padding: 24px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-                .header { text-align: center; margin-bottom: 24px; }
-                .footer { text-align: center; font-size: 12px; color: #6b7280; margin-top: 24px; }
-                .urgency-indicator { text-align: center; margin: 16px 0; }
-                .urgency-bar { height: 6px; border-radius: 3px; background-color: #fee2e2; position: relative; overflow: hidden; }
-                .urgency-progress { height: 100%; background-color: #ef4444; width: ${Math.min((notifCount + 1) * 16, 90)}%; transition: width 0.3s ease; }
-                .unsubscribe { text-align: center; margin-top: 24px; font-size: 12px; color: #6b7280; }
-                .unsubscribe a { color: #6b7280; text-decoration: underline; }
-                .email-count { background-color: #fef3c7; color: #92400e; padding: 8px 12px; border-radius: 6px; font-size: 12px; margin-bottom: 16px; text-align: center; }
-                @media (max-width: 600px) {
-                  .container { padding: 10px; }
-                  .card { padding: 16px; }
-                }
-              </style>
-            </head>
-            <body>
-              <div class="container">
-                <div class="card">
-                  <div class="header">
-                    <h1 style="margin: 0; color: #111827; font-size: 24px;">תורים פנויים במספרת רם-אל!</h1>
-                    <p style="margin: 8px 0 0; color: #6b7280; font-size: 16px;">
-                      ${matchingResults.length === 1 ? 'מצאנו תור זמין בתאריך שביקשת' : `מצאנו ${matchingResults.length} תאריכים זמינים בטווח שביקשת`}
-                    </p>
-                  </div>
-                  
-                  ${notifCount > 0 ? `
-                  <div class="email-count">
-                    התראה מספר ${notifCount + 1} מתוך 6 | נותרו ${6 - notifCount - 1} התראות
-                  </div>` : ''}
-                  
-                  ${notifCount > 0 ? `
-                  <div class="urgency-indicator">
-                    <p style="margin: 4px 0 8px; font-size: 14px; color: #b91c1c;">רמת דחיפות</p>
-                    <div class="urgency-bar">
-                      <div class="urgency-progress"></div>
-                    </div>
-                    ${notifCount >= 2 ? `<p style="margin: 8px 0 0; font-size: 13px; color: #b91c1c;">⚠️ אזהרה: התורים עלולים להתמלא במהרה</p>` : ''}
-                  </div>` : ''}
-                  
-                  <div style="margin: 24px 0;">
-                    ${appointmentCards}
-                  </div>
-                  
-                  <div class="unsubscribe">
-                    <p><a href="${unsubscribeUrl}">הסר הרשמה מההתראות</a></p>
-                  </div>
-                </div>
-                
-                <div class="footer">
-                  <p>התראה זו נשלחה באופן אוטומטי ממערכת בדיקת תורים למספרת רם-אל.</p>
-                  <p>אין להשיב למייל זה.</p>
-                </div>
-              </div>
-            </body>
-          </html>
-          `;
-
-          // Plain text version
-          const plainText = `תורים פנויים במספרת רם-אל!
-
-${matchingResults.map(apt => `
-תאריך: ${apt.date} (${getDayNameHebrew(apt.date)})
-זמנים זמינים: ${apt.times.join(', ')}
-קישור לקביעת תור: ${generateBookingUrl(apt.date)}
-`).join('\n')}
-
-להסרה מההתראות: ${unsubscribeUrl}
-
-התראה מספר ${notifCount + 1} מתוך 6`;
+          // Generate modern email content using the new template system
+          const emailContent = generateModernEmailTemplate({
+            matchingResults,
+            notificationCount: currentNotifCount,
+            unsubscribeUrl: `https://tor-ramel.netlify.app/unsubscribe?token=${notification.unsubscribe_token}`,
+            userEmail: notification.email,
+            criteriaType: notification.criteria_type as 'single' | 'range'
+          });
 
           const mailOptions = {
             from: `"תורים לרם-אל" <${process.env.EMAIL_SENDER}>`,
             to: notification.email,
-            subject: subject,
-            text: plainText,
-            html: emailHtml
+            subject: emailContent.subject,
+            text: emailContent.text,
+            html: emailContent.html
           };
 
           // Add to batch promises

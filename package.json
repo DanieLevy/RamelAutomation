@@ -11,7 +11,9 @@
     "pwa:build": "npm run generate:icons && npm run build",
     "dev:netlify": "netlify dev",
     "deploy:test": "netlify deploy",
-    "deploy:prod": "netlify deploy --prod"
+    "deploy:prod": "netlify deploy --prod",
+    "test:emails": "node scripts/test-emails.js",
+    "test:comprehensive": "node scripts/comprehensive-test.js"
   },
   "dependencies": {
     "@netlify/functions": "^4.1.6",

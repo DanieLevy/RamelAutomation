@@ -21,6 +21,7 @@ interface DatePickerProps {
   className?: string
   disabled?: boolean
   placeholder?: string
+  autoClose?: boolean
 }
 
 export function DatePicker({
@@ -29,9 +30,19 @@ export function DatePicker({
   className,
   disabled,
   placeholder = "בחר תאריך",
+  autoClose = false,
 }: DatePickerProps) {
+  const [open, setOpen] = React.useState(false)
+
+  const handleDateChange = (selectedDate: Date | undefined) => {
+    onDateChange?.(selectedDate)
+    if (autoClose && selectedDate) {
+      setOpen(false)
+    }
+  }
+
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant={"outline"}
@@ -54,7 +65,7 @@ export function DatePicker({
         <Calendar
           mode="single"
           selected={date}
-          onSelect={onDateChange}
+          onSelect={handleDateChange}
           initialFocus
           locale={he}
           weekStartsOn={0} // Sunday
@@ -71,6 +82,7 @@ interface DateRangePickerProps {
   className?: string
   disabled?: boolean
   placeholder?: string
+  autoClose?: boolean
 }
 
 export function DateRangePicker({
@@ -79,9 +91,22 @@ export function DateRangePicker({
   className,
   disabled,
   placeholder = "בחר טווח תאריכים",
+  autoClose = false,
 }: DateRangePickerProps) {
+  const [open, setOpen] = React.useState(false)
+
+  const handleDateRangeChange = (range: DateRange | undefined) => {
+    if (range) {
+      onDateRangeChange(range);
+      // Auto-close when both dates are selected
+      if (autoClose && range.from && range.to) {
+        setOpen(false)
+      }
+    }
+  }
+
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant={"outline"}
@@ -111,9 +136,7 @@ export function DateRangePicker({
           mode="range"
           defaultMonth={dateRange?.from}
           selected={dateRange as DateRange}
-          onSelect={(range) => {
-            if (range) onDateRangeChange(range);
-          }}
+          onSelect={handleDateRangeChange}
           numberOfMonths={2}
           locale={he}
           weekStartsOn={0}

@@ -29,72 +29,72 @@
 
 @layer base {
   :root {
-    /* Monochrome color palette */
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
+    /* New Minimal Color Palette */
+    --background: 0 0% 98%; /* #fafafa - very light grey background */
+    --foreground: 0 0% 9%; /* #171717 - dark text */
+    --card: 0 0% 100%; /* Pure white for cards */
+    --card-foreground: 0 0% 9%; /* #171717 - dark text on cards */
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
+    --popover-foreground: 0 0% 9%;
+    --primary: 0 0% 15%; /* #262626 - dark grey accent (replacing red) */
+    --primary-foreground: 0 0% 100%; /* White text on dark grey */
+    --secondary: 0 0% 75%; /* #bfbfbf - medium grey */
+    --secondary-foreground: 0 0% 15%; /* Dark text on medium grey */
+    --muted: 0 0% 93%; /* #ededed - light grey */
+    --muted-foreground: 0 0% 40%; /* #666666 - medium grey text on light */
+    --accent: 0 0% 25%; /* #404040 - darker grey accent (replacing red) */
+    --accent-foreground: 0 0% 100%; /* White text on dark grey */
+    --destructive: 0 0% 40%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 85%; /* Light border */
+    --input: 0 0% 100%; /* White input backgrounds */
+    --ring: 0 0% 30%; /* Focus rings */
     --radius: 0.5rem;
 
-    /* Special UI colors (use sparingly) */
-    --success: 142 72% 29%;
+    /* Special UI colors */
+    --success: 160 10% 40%;
     --success-foreground: 0 0% 100%;
-    --pending: 48 96% 53%;
-    --pending-foreground: 0 0% 12%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    --pending: 0 0% 50%;
+    --pending-foreground: 0 0% 100%;
+    --chart-1: 0 0% 15%; /* Dark grey */
+    --chart-2: 0 0% 40%; /* Medium grey */
+    --chart-3: 0 0% 65%; /* Light grey */
+    --chart-4: 0 0% 90%; /* Very light grey */
+    --chart-5: 0 0% 25%;
   }
 
   .dark {
-    /* Monochrome dark palette */
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
+    /* Dark mode with minimal contrast */
+    --background: 0 0% 9%; /* #171717 - dark background */
+    --foreground: 0 0% 93%; /* #ededed - light text */
+    --card: 0 0% 15%; /* Slightly lighter than background */
+    --card-foreground: 0 0% 93%; /* #ededed - light text on cards */
+    --popover: 0 0% 15%;
+    --popover-foreground: 0 0% 93%;
+    --primary: 0 0% 85%; /* #d9d9d9 - light grey accent (replacing red) */
+    --primary-foreground: 0 0% 9%; /* Dark text on light grey */
+    --secondary: 0 0% 25%; /* #404040 - medium grey */
+    --secondary-foreground: 0 0% 93%; /* Light text on medium grey */
+    --muted: 0 0% 15%; /* Dark muted background */
+    --muted-foreground: 0 0% 70%; /* Light muted text */
+    --accent: 0 0% 75%; /* #bfbfbf - light grey accent (replacing red) */
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 0% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 25%; /* #404040 - medium grey borders */
+    --input: 0 0% 15%; /* Dark input backgrounds */
+    --ring: 0 0% 75%;
 
     /* Special UI colors for dark mode */
-    --success: 142 70% 45%;
-    --success-foreground: 0 0% 12%;
-    --pending: 48 96% 60%;
-    --pending-foreground: 0 0% 12%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    --success: 160 5% 65%;
+    --success-foreground: 0 0% 9%;
+    --pending: 0 0% 60%;
+    --pending-foreground: 0 0% 9%;
+    --chart-1: 0 0% 85%;
+    --chart-2: 0 0% 60%;
+    --chart-3: 0 0% 40%;
+    --chart-4: 0 0% 20%;
+    --chart-5: 0 0% 75%;
   }
 }
 
@@ -104,7 +104,7 @@
   }
   
   body {
-    @apply bg-neutral-50 text-neutral-800 dark:bg-neutral-900 dark:text-neutral-100;
+    @apply bg-background text-foreground;
     font-family: 'Ploni', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     direction: rtl;
     text-align: right;
@@ -126,6 +126,35 @@
 
   .font-normal {
     font-weight: 400;
+  }
+
+  /* Minimal color scheme utilities */
+  .text-minimal-dark {
+    color: #171717;
+  }
+
+  .text-minimal-grey {
+    color: #6b7280;
+  }
+
+  .text-minimal-light-grey {
+    color: #9ca3af;
+  }
+
+  .bg-minimal-light {
+    background-color: #f9fafb;
+  }
+
+  .bg-minimal-card {
+    background-color: #ffffff;
+  }
+
+  .bg-minimal-muted {
+    background-color: #f3f4f6;
+  }
+
+  .border-minimal {
+    border-color: #e5e7eb;
   }
 
   /* Ensure proper Hebrew text rendering */
@@ -388,5 +417,219 @@ a {
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* Bento Grid Layout - 2025 Trend */
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-auto-rows: minmax(120px, auto);
+  gap: 1rem;
+}
+
+.bento-item {
+  @apply bg-card/80 backdrop-blur-lg rounded-2xl border border-border/20 p-4 shadow-lg hover:shadow-xl transition-all duration-300;
+  position: relative;
+  overflow: hidden;
+}
+
+.bento-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at 20% 80%, hsl(var(--primary) / 0.05) 0%, transparent 50%),
+              radial-gradient(circle at 80% 20%, hsl(var(--secondary) / 0.05) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.bento-large {
+  grid-column: span 2;
+  min-height: 160px;
+}
+
+.bento-medium {
+  grid-column: span 1;
+  min-height: 140px;
+}
+
+.bento-small {
+  grid-column: span 1;
+  min-height: 120px;
+}
+
+/* Blur and Grainy Effects - 2025 Trend */
+.blur-backdrop {
+  @apply backdrop-blur-xl bg-white/10 dark:bg-gray-900/10;
+}
+
+.grain-texture {
+  position: relative;
+}
+
+.grain-texture::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  pointer-events: none;
+}
+
+/* Low Light Mode Enhancement - 2025 Trend */
+.low-light {
+  --background: 220 27% 8%;
+  --foreground: 220 9% 92%;
+  --card: 220 27% 10%;
+  --card-foreground: 220 9% 92%;
+  --primary: 217 91% 65%;
+  --primary-foreground: 220 9% 8%;
+  --muted: 220 27% 14%;
+  --muted-foreground: 220 9% 65%;
+  --border: 220 27% 18%;
+}
+
+/* Kinetic Typography - 2025 Trend */
+.kinetic-text {
+  background: linear-gradient(45deg, hsl(0 0% 15%), hsl(0 0% 40%), hsl(0 0% 70%));
+  background-size: 300% 300%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradient-flow 3s ease-in-out infinite;
+}
+
+@keyframes gradient-flow {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.text-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Interactive 3D Elements - 2025 Trend */
+.card-3d {
+  transform-style: preserve-3d;
+  transition: transform 0.3s ease;
+}
+
+.card-3d:hover {
+  transform: perspective(1000px) rotateX(5deg) rotateY(5deg) translateZ(10px);
+}
+
+.float-animation {
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+/* Modern Button Styles */
+.btn-modern {
+  @apply relative overflow-hidden rounded-2xl px-6 py-3 font-medium transition-all duration-300;
+  background: linear-gradient(135deg, hsl(0 0% 15%), hsl(0 0% 30%));
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.btn-modern:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+}
+
+.btn-modern::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: left 0.5s;
+}
+
+.btn-modern:hover::before {
+  left: 100%;
+}
+
+/* Status Indicators */
+.status-online {
+  @apply inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium;
+  background: linear-gradient(135deg, hsl(0 0% 90% / 0.2), hsl(0 0% 90% / 0.1));
+  border: 1px solid hsl(0 0% 85% / 0.3);
+  color: hsl(0 0% 20%);
+}
+
+.status-offline {
+  @apply inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium;
+  background: linear-gradient(135deg, hsl(0 0% 20% / 0.1), hsl(0 0% 20% / 0.05));
+  border: 1px solid hsl(0 0% 20% / 0.2);
+  color: hsl(0 0% 30%);
+}
+
+/* Mobile Responsive Bento Grid */
+@media (max-width: 640px) {
+  .bento-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .bento-large,
+  .bento-medium,
+  .bento-small {
+    grid-column: span 1;
+  }
+}
+
+/* Header animations */
+.sticky-header-enter {
+  transform: translateY(-100%);
+  opacity: 0;
+}
+
+.sticky-header-enter-active {
+  transform: translateY(0);
+  opacity: 1;
+  transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+}
+
+.sticky-header-exit {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.sticky-header-exit-active {
+  transform: translateY(-100%);
+  opacity: 0;
+  transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+}
+
+/* Smooth appearance for cards */
+.card-animate-in {
+  animation: cardAppear 0.5s ease-out forwards;
+}
+
+@keyframes cardAppear {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 } 
