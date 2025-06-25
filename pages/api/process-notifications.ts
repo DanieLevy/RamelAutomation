@@ -213,7 +213,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             // Second phase: 1 hour between emails
             requiredInterval = 60 * 60 * 1000; // 1 hour
           }
-
+          
           if (isTestMode) {
             console.log(`📧 🧪 TEST: Processing email for ${currentNotification.email}, count: ${currentNotifCount}, phase: ${notificationPhase}`);
           }

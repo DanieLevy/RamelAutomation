@@ -169,4 +169,4 @@ async function handleGetHistory(req: NextApiRequest, res: NextApiResponse) {
 
 async function createEmailHistoryTable() {
   // ... existing code ...
-}
+} 

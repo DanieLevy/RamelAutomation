@@ -405,7 +405,7 @@ const generateEmailStyles = (): string => `
 
     .footer-link {
       color: #64748b;
-      text-decoration: none;
+        text-decoration: none;
       font-size: 14px;
       font-weight: 500;
       margin: 0 12px;
@@ -414,7 +414,7 @@ const generateEmailStyles = (): string => `
 
     .footer-link:hover {
       color: #3b82f6;
-      text-decoration: underline;
+        text-decoration: underline;
     }
 
     .footer-copyright {
