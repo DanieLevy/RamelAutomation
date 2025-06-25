@@ -165,6 +165,7 @@ export default function Home() {
   const [notifyEmail, setNotifyEmail] = useState('')
   const [notifyDate, setNotifyDate] = useState<Date | undefined>(undefined)
   const [notifyDateRange, setNotifyDateRange] = useState<{from?: Date, to?: Date}>({from: undefined, to: undefined})
+  const [subscribedEmail, setSubscribedEmail] = useState<string | undefined>(undefined)
 
   // State for sticky header
   const [isHeaderSticky, setIsHeaderSticky] = useState(false)
@@ -588,71 +589,6 @@ ${availableResults.length} תאריכים זמינים
     }).format(lastCheckDate);
   }
 
-  const handleNotifySubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setNotifyLoading(true)
-    setNotifyStatus(null)
-    
-    try {
-      // Basic validations
-      if (!notifyEmail.trim()) {
-        throw new Error('יש להזין כתובת מייל')
-      }
-      
-      if (notifyType === 'single' && !notifyDate) {
-        throw new Error('יש לבחור תאריך')
-      }
-      
-      if (notifyType === 'range' && !notifyDateRange.from) {
-        throw new Error('יש לבחור לפחות תאריך התחלה')
-      }
-      
-      // Format request based on notification type
-      let requestPayload: any = {
-        email: notifyEmail,
-        smartSelection: true // Enable smart date selection by default
-      }
-      
-      if (notifyType === 'single') {
-        requestPayload.date = format(notifyDate!, 'yyyy-MM-dd')
-      } else {
-        requestPayload.start = format(notifyDateRange.from!, 'yyyy-MM-dd')
-        requestPayload.end = notifyDateRange.to 
-          ? format(notifyDateRange.to, 'yyyy-MM-dd') 
-          : format(notifyDateRange.from!, 'yyyy-MM-dd')
-      }
-      
-      // Send API request
-      const response = await fetch('/api/notify-request', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestPayload)
-      })
-      
-      const data = await response.json()
-      
-      if (response.ok) {
-        // Success notification with custom message from server
-        setNotifyStatus(`✓ ${data.message || 'נרשמת בהצלחה! תקבל מייל כאשר יתפנה תור'}`)
-        
-        // Clear form fields on success
-        setNotifyEmail('')
-        setNotifyDate(undefined)
-        setNotifyDateRange({from: undefined, to: undefined})
-      } else {
-        // Show error message from server or fallback
-        setNotifyStatus(`❌ ${data.error || 'שגיאה ברישום להתראות'}`)
-      }
-    } catch (error: any) {
-      console.error('Error submitting notify request:', error)
-      setNotifyStatus(`❌ ${error.message || 'שגיאה ברישום להתראות'}`)
-    } finally {
-      setNotifyLoading(false)
-    }
-  }
-
   useEffect(() => {
     // Check if online
     setIsOnline(navigator.onLine)
@@ -674,6 +610,59 @@ ${availableResults.length} תאריכים זמינים
       window.removeEventListener('scroll', handleScroll)
     }
   }, [])
+
+  const handleNotifySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setNotifyLoading(true);
+    setNotifyStatus(null);
+    try {
+      // Basic validations
+      if (!notifyEmail.trim()) {
+        throw new Error('יש להזין כתובת מייל');
+      }
+      if (notifyType === 'single' && !notifyDate) {
+        throw new Error('יש לבחור תאריך');
+      }
+      if (notifyType === 'range' && !notifyDateRange.from) {
+        throw new Error('יש לבחור לפחות תאריך התחלה');
+      }
+      // Format request based on notification type
+      let requestPayload: any = {
+        email: notifyEmail,
+        smartSelection: true // Enable smart date selection by default
+      };
+      if (notifyType === 'single') {
+        requestPayload.date = format(notifyDate!, 'yyyy-MM-dd');
+      } else {
+        requestPayload.start = format(notifyDateRange.from!, 'yyyy-MM-dd');
+        requestPayload.end = notifyDateRange.to 
+          ? format(notifyDateRange.to, 'yyyy-MM-dd') 
+          : format(notifyDateRange.from!, 'yyyy-MM-dd');
+      }
+      // Send API request
+      const response = await fetch('/api/notify-request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestPayload)
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setSubscribedEmail(notifyEmail);
+        setNotifyStatus(`✓ ${data.message || 'נרשמת בהצלחה! תקבל מייל כאשר יתפנה תור'}`);
+        setNotifyEmail('');
+        setNotifyDate(undefined);
+        setNotifyDateRange({from: undefined, to: undefined});
+      } else {
+        setNotifyStatus(`❌ ${data.error || 'שגיאה ברישום להתראות'}`);
+      }
+    } catch (error: any) {
+      setNotifyStatus(`❌ ${error.message || 'שגיאה ברישום להתראות'}`);
+    } finally {
+      setNotifyLoading(false);
+    }
+  };
 
   return (
     <div className="bg-background min-h-screen">
@@ -807,6 +796,7 @@ ${availableResults.length} תאריכים זמינים
           notifyLoading={notifyLoading}
           notifyStatus={notifyStatus}
           onSubmit={handleNotifySubmit}
+          subscribedEmail={subscribedEmail}
         />
 
         {/* Manual Search Component */}

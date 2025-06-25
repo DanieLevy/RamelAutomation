@@ -69,6 +69,8 @@ export default function ManagePage() {
   const [tokenValidated, setTokenValidated] = useState(false);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [selectedSubscription, setSelectedSubscription] = useState<NotificationData | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
   useEffect(() => {
     // If token is in URL, validate and store it
@@ -217,6 +219,7 @@ export default function ManagePage() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchEmail.trim()) {
+      setHasSearched(true);
       requestManagementAccess(searchEmail.trim());
     }
   };
@@ -240,9 +243,9 @@ export default function ManagePage() {
 
       setError(null);
       setLoading(false);
-      
-      // Show success message
-      alert(`✅ ${data.message}`);
+      setEmailSent(true);
+      // Show success message (optional: toast or alert)
+      // alert(`✅ ${data.message}`);
 
     } catch (error: any) {
       console.error('Request management access error:', error);
@@ -403,343 +406,345 @@ export default function ManagePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen flex flex-col bg-background">
       {/* Theme Toggle */}
       <div className="fixed top-4 left-4 z-10">
         <ThemeToggle />
       </div>
 
-      {/* Header */}
-      <div className="border-b border-border bg-card">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-3xl font-light text-foreground">ניהול התראות</h1>
-              <p className="text-muted-foreground mt-1">נהל את כל ההרשמות שלך להתראות במספרת רם-אל</p>
-            </div>
-            <Button 
-              onClick={() => router.push('/')}
-              variant="outline"
-              className="gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              חזרה לאפליקציה
-            </Button>
-          </div>
-
-          {/* Secure Access Form */}
-          {!tokenValidated && (
-            <form onSubmit={handleSearch} className="space-y-4 max-w-md">
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                  <span className="font-medium text-blue-800 dark:text-blue-200">גישה מאובטחת</span>
-                </div>
-                <p className="text-sm text-blue-700 dark:text-blue-300">
-                  לאבטחת הפרטיות, נשלח לך קישור מאובטח למייל לניהול ההתראות שלך
-                </p>
+      <main className="flex-1">
+        {/* Header */}
+        <div className="border-b border-border bg-card">
+          <div className="container mx-auto px-4 py-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h1 className="text-3xl font-light text-foreground">ניהול התראות</h1>
+                <p className="text-muted-foreground mt-1">נהל את כל ההרשמות שלך להתראות במספרת רם-אל</p>
               </div>
-              
-              <div className="flex gap-3">
-                <input
-                  type="email"
-                  value={searchEmail}
-                  onChange={(e) => setSearchEmail(e.target.value)}
-                  placeholder="הכנס כתובת מייל לקבלת קישור מאובטח..."
-                  className="flex-1 px-4 py-2 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  required
-                />
-                <Button type="submit" className="px-6" disabled={loading}>
-                  {loading ? 'שולח...' : 'שלח קישור'}
-                </Button>
-              </div>
-            </form>
-          )}
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="container mx-auto px-4 py-8">
-        {error && (
-          <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-lg mb-6">
-            {error}
-          </div>
-        )}
-
-        {!tokenValidated && !userEmail && !error && (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-            </div>
-            <h2 className="text-xl font-medium text-foreground mb-2">גישה מאובטחת להתראות</h2>
-            <p className="text-muted-foreground">הכנס את כתובת המייל שלך לקבלת קישור מאובטח לניהול ההתראות</p>
-          </div>
-        )}
-
-        {searchEmail && subscriptions.length === 0 && !error && (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-              </svg>
-            </div>
-            <h2 className="text-xl font-medium text-foreground mb-2">לא נמצאו הרשמות</h2>
-            <p className="text-muted-foreground mb-4">לא נמצאו הרשמות עבור כתובת המייל: {searchEmail}</p>
-            <Button onClick={() => router.push('/')} className="gap-2">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-              צור הרשמה חדשה
-            </Button>
-          </div>
-        )}
-
-        {subscriptions.length > 0 && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-medium text-foreground">
-                הרשמות עבור {searchEmail} ({subscriptions.length})
-              </h2>
-              <Button onClick={() => router.push('/')} variant="outline" className="gap-2">
+              <Button 
+                onClick={() => router.push('/')}
+                variant="outline"
+                className="gap-2"
+              >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
-                הרשמה חדשה
+                חזרה לאפליקציה
               </Button>
             </div>
 
-            <div className="space-y-4">
-              {/* Active subscriptions */}
-              {subscriptions.filter(s => s.status === 'active').map((subscription) => {
-                const statusInfo = getStatusInfo(subscription.status);
-                const history = getEmailHistoryForSubscription(subscription.id);
-                const isExpanded = expandedSubscriptions.has(subscription.id);
-                
-                return (
-                  <Card key={subscription.id} className="overflow-hidden">
-                    {/* Header - Always visible */}
-                    <div className="p-4 border-b border-border">
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-2 flex-1">
-                          <div className="flex items-center gap-3">
-                            <Badge variant={statusInfo.variant} className="gap-1">
-                              <span>{statusInfo.icon}</span>
-                              {statusInfo.text}
-                            </Badge>
-                            <span className="text-sm text-muted-foreground">
-                              {formatCriteria(subscription.criteria_type, subscription.criteria)}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            <span>התראות: {subscription.notification_count}/6</span>
-                            <span>נוצר: {formatDate(subscription.created_at)}</span>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-2">
-                          <Button
-                            onClick={() => toggleSubscriptionExpansion(subscription.id)}
-                            variant="ghost"
-                            size="sm"
-                            className="gap-1"
-                          >
-                            <span>פרטים</span>
-                            <svg 
-                              className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
-                              fill="none" 
-                              viewBox="0 0 24 24" 
-                              stroke="currentColor"
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </Button>
-                          <Button
-                            onClick={() => handleCancelSubscription(subscription.id, subscription.unsubscribe_token)}
-                            variant="outline"
-                            size="sm"
-                            className="text-destructive hover:bg-destructive/10"
-                          >
-                            בטל
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
+            {/* Secure Access Form Header/Description - only show if not emailSent */}
+            {!emailSent && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6 flex items-center gap-3">
+                <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                <div>
+                  <span className="font-medium text-blue-800 dark:text-blue-200 block mb-1">גישה מאובטחת</span>
+                  <span className="text-sm text-blue-700 dark:text-blue-300">לאבטחת הפרטיות, נשלח לך קישור מאובטח למייל לניהול ההתראות שלך</span>
+                </div>
+              </div>
+            )}
+            {/* Secure Access Form */}
+            {!tokenValidated && !emailSent && (
+              <form onSubmit={handleSearch} className="space-y-4 max-w-md mx-auto flex flex-col items-center">
+                <div className="flex gap-3 w-full">
+                  <input
+                    type="email"
+                    value={searchEmail}
+                    onChange={(e) => setSearchEmail(e.target.value)}
+                    placeholder="הכנס כתובת מייל לקבלת קישור מאובטח..."
+                    className="flex-1 px-4 py-2 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    required
+                  />
+                  <Button type="submit" className="px-6" disabled={loading}>
+                    {loading ? 'שולח...' : 'שלח קישור'}
+                  </Button>
+                </div>
+              </form>
+            )}
+            {emailSent && !tokenValidated && (
+              <div className="flex flex-col items-center justify-center py-16">
+                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6">
+                  <svg className="w-12 h-12 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 12V8a4 4 0 10-8 0v4m12 4v-2a4 4 0 00-3-3.87M8 16h8m-4 4v-4" />
+                  </svg>
+                </div>
+                <h2 className="text-2xl font-semibold text-foreground mb-2">קישור נשלח למייל</h2>
+                <p className="text-muted-foreground mb-6 text-center">שלחנו קישור מאובטח לכתובת: <span className="font-semibold">{searchEmail}</span><br />בדוק את תיבת הדואר שלך ולחץ על הקישור כדי להיכנס לניהול ההתראות.</p>
+                <Button onClick={() => { setEmailSent(false); setHasSearched(false); setSearchEmail(''); }} variant="outline">הזן מייל אחר</Button>
+              </div>
+            )}
+          </div>
+        </div>
 
-                    {/* Expanded Details */}
-                    {isExpanded && (
-                      <div className="p-6 bg-muted/30">
-                        <div className="grid md:grid-cols-2 gap-6">
-                          <div className="space-y-3">
-                            <h4 className="font-medium text-foreground">פרטי ההרשמה</h4>
-                            <div className="space-y-2 text-sm">
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">קריטריונים</span>
-                                <span className="font-medium">{formatCriteria(subscription.criteria_type, subscription.criteria)}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">התראות שנשלחו</span>
-                                <span className="font-medium">{subscription.notification_count} מתוך 6</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">התראה אחרונה</span>
-                                <span className="font-medium">
-                                  {subscription.last_notified ? formatDate(subscription.last_notified) : 'אף פעם'}
-                                </span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">עודכן לאחרונה</span>
-                                <span className="font-medium">{formatDate(subscription.updated_at)}</span>
-                              </div>
-                            </div>
-                          </div>
+        {/* Main Content */}
+        <div className="container mx-auto px-4 py-8">
+          {error && (
+            <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-lg mb-6">
+              {error}
+            </div>
+          )}
 
-                          <div className="space-y-3">
-                            <h4 className="font-medium text-foreground">התקדמות התראות</h4>
-                            <div className="space-y-2">
-                              <div className="flex justify-between text-sm">
-                                <span className="text-muted-foreground">התקדמות</span>
-                                <span className="font-medium">{subscription.notification_count}/6</span>
-                              </div>
-                              <div className="w-full bg-muted rounded-full h-2">
-                                <div 
-                                  className="bg-primary h-2 rounded-full transition-all duration-300"
-                                  style={{ width: `${(subscription.notification_count / 6) * 100}%` }}
-                                ></div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+          {hasSearched && searchEmail && subscriptions.length === 0 && !error && !emailSent && (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-medium text-foreground mb-2">לא נמצאו הרשמות</h2>
+              <p className="text-muted-foreground mb-4">לא נמצאו הרשמות עבור כתובת המייל: {searchEmail}</p>
+              <Button onClick={() => router.push('/')} className="gap-2">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                צור הרשמה חדשה
+              </Button>
+            </div>
+          )}
 
-                        {/* Actions */}
-                        <div className="flex gap-2 pt-4 border-t border-border mt-4">
-                          <Button
-                            onClick={() => {
-                              setSelectedSubscription(subscription);
-                              setDetailsDialogOpen(true);
-                            }}
-                            variant="outline"
-                            size="sm"
-                            className="gap-2"
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            פרטים מלאים
-                          </Button>
-                          {subscription.criteria_type === 'range' && subscription.criteria?.start && (
-                            <Button
-                              onClick={() => {
-                                const criteria = subscription.criteria;
-                                const searchParams = new URLSearchParams({
-                                  email: subscription.email,
-                                  hasDate: 'false',
-                                  hasStart: 'true',
-                                  hasEnd: 'true',
-                                  startDate: criteria.start,
-                                  endDate: criteria.end
-                                });
-                                router.push(`/?${searchParams.toString()}`);
-                              }}
-                              variant="outline"
-                              size="sm"
-                              className="gap-2"
-                            >
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                              </svg>
-                              חזור על החיפוש
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </Card>
-                );
-              })}
+          {subscriptions.length > 0 && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-medium text-foreground">
+                  הרשמות עבור {searchEmail} ({subscriptions.length})
+                </h2>
+                <Button onClick={() => router.push('/')} variant="outline" className="gap-2">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  הרשמה חדשה
+                </Button>
+              </div>
 
-              {/* Inactive subscriptions - Collapsed by default */}
-              {subscriptions.filter(s => s.status !== 'active').length > 0 && (
-                <div className="space-y-3">
-                  <h3 className="text-lg font-medium text-muted-foreground">הרשמות לא פעילות</h3>
-                  {subscriptions.filter(s => s.status !== 'active').map((subscription) => {
-                    const statusInfo = getStatusInfo(subscription.status);
-                    const isExpanded = expandedSubscriptions.has(subscription.id);
-                    
-                    return (
-                      <Card key={subscription.id} className="overflow-hidden opacity-75">
-                        {/* Collapsed Header */}
-                        <div className="p-3 bg-muted/50">
-                          <div className="flex items-center justify-between">
+              <div className="space-y-4">
+                {/* Active subscriptions */}
+                {subscriptions.filter(s => s.status === 'active').map((subscription) => {
+                  const statusInfo = getStatusInfo(subscription.status);
+                  const history = getEmailHistoryForSubscription(subscription.id);
+                  const isExpanded = expandedSubscriptions.has(subscription.id);
+                  
+                  return (
+                    <Card key={subscription.id} className="overflow-hidden">
+                      {/* Header - Always visible */}
+                      <div className="p-4 border-b border-border">
+                        <div className="flex items-start justify-between">
+                          <div className="space-y-2 flex-1">
                             <div className="flex items-center gap-3">
-                              <Badge variant={statusInfo.variant} className="gap-1 text-xs">
+                              <Badge variant={statusInfo.variant} className="gap-1">
                                 <span>{statusInfo.icon}</span>
                                 {statusInfo.text}
                               </Badge>
                               <span className="text-sm text-muted-foreground">
                                 {formatCriteria(subscription.criteria_type, subscription.criteria)}
                               </span>
-                              <span className="text-xs text-muted-foreground">
-                                {subscription.notification_count}/6 התראות
-                              </span>
                             </div>
-                            
-                            <div className="flex items-center gap-1">
-                              <Button
-                                onClick={() => toggleSubscriptionExpansion(subscription.id)}
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 px-2 text-xs"
-                              >
-                                {isExpanded ? 'הסתר' : 'הצג'}
-                              </Button>
-                              <Button
-                                onClick={() => handleDeleteSubscription(subscription.id)}
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 px-2 text-xs text-destructive hover:bg-destructive/10"
-                              >
-                                מחק
-                              </Button>
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                              <span>התראות: {subscription.notification_count}/6</span>
+                              <span>נוצר: {formatDate(subscription.created_at)}</span>
                             </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-2">
+                            <Button
+                              onClick={() => toggleSubscriptionExpansion(subscription.id)}
+                              variant="ghost"
+                              size="sm"
+                              className="gap-1"
+                            >
+                              <span>פרטים</span>
+                              <svg 
+                                className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
+                                fill="none" 
+                                viewBox="0 0 24 24" 
+                                stroke="currentColor"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </Button>
+                            <Button
+                              onClick={() => handleCancelSubscription(subscription.id, subscription.unsubscribe_token)}
+                              variant="outline"
+                              size="sm"
+                              className="text-destructive hover:bg-destructive/10"
+                            >
+                              בטל
+                            </Button>
                           </div>
                         </div>
+                      </div>
 
-                        {/* Expanded Details for inactive */}
-                        {isExpanded && (
-                          <div className="p-4 border-t border-border">
-                            <div className="space-y-3 text-sm">
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">סטטוס</span>
-                                <span className="font-medium">{statusInfo.description}</span>
+                      {/* Expanded Details */}
+                      {isExpanded && (
+                        <div className="p-6 bg-muted/30">
+                          <div className="grid md:grid-cols-2 gap-6">
+                            <div className="space-y-3">
+                              <h4 className="font-medium text-foreground">פרטי ההרשמה</h4>
+                              <div className="space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">קריטריונים</span>
+                                  <span className="font-medium">{formatCriteria(subscription.criteria_type, subscription.criteria)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">התראות שנשלחו</span>
+                                  <span className="font-medium">{subscription.notification_count} מתוך 6</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">התראה אחרונה</span>
+                                  <span className="font-medium">
+                                    {subscription.last_notified ? formatDate(subscription.last_notified) : 'אף פעם'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">עודכן לאחרונה</span>
+                                  <span className="font-medium">{formatDate(subscription.updated_at)}</span>
+                                </div>
                               </div>
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">נוצר</span>
-                                <span className="font-medium">{formatDate(subscription.created_at)}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">התראה אחרונה</span>
-                                <span className="font-medium">
-                                  {subscription.last_notified ? formatDate(subscription.last_notified) : 'אף פעם'}
-                                </span>
+                            </div>
+
+                            <div className="space-y-3">
+                              <h4 className="font-medium text-foreground">התקדמות התראות</h4>
+                              <div className="space-y-2">
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">התקדמות</span>
+                                  <span className="font-medium">{subscription.notification_count}/6</span>
+                                </div>
+                                <div className="w-full bg-muted rounded-full h-2">
+                                  <div 
+                                    className="bg-primary h-2 rounded-full transition-all duration-300"
+                                    style={{ width: `${(subscription.notification_count / 6) * 100}%` }}
+                                  ></div>
+                                </div>
                               </div>
                             </div>
                           </div>
-                        )}
-                      </Card>
-                    );
-                  })}
-                </div>
-              )}
+
+                          {/* Actions */}
+                          <div className="flex gap-2 pt-4 border-t border-border mt-4">
+                            <Button
+                              onClick={() => {
+                                setSelectedSubscription(subscription);
+                                setDetailsDialogOpen(true);
+                              }}
+                              variant="outline"
+                              size="sm"
+                              className="gap-2"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              פרטים מלאים
+                            </Button>
+                            {subscription.criteria_type === 'range' && subscription.criteria?.start && (
+                              <Button
+                                onClick={() => {
+                                  const criteria = subscription.criteria;
+                                  const searchParams = new URLSearchParams({
+                                    email: subscription.email,
+                                    hasDate: 'false',
+                                    hasStart: 'true',
+                                    hasEnd: 'true',
+                                    startDate: criteria.start,
+                                    endDate: criteria.end
+                                  });
+                                  router.push(`/?${searchParams.toString()}`);
+                                }}
+                                variant="outline"
+                                size="sm"
+                                className="gap-2"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                חזור על החיפוש
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </Card>
+                  );
+                })}
+
+                {/* Inactive subscriptions - Collapsed by default */}
+                {subscriptions.filter(s => s.status !== 'active').length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-medium text-muted-foreground">הרשמות לא פעילות</h3>
+                    {subscriptions.filter(s => s.status !== 'active').map((subscription) => {
+                      const statusInfo = getStatusInfo(subscription.status);
+                      const isExpanded = expandedSubscriptions.has(subscription.id);
+                      
+                      return (
+                        <Card key={subscription.id} className="overflow-hidden opacity-75">
+                          {/* Collapsed Header */}
+                          <div className="p-3 bg-muted/50">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <Badge variant={statusInfo.variant} className="gap-1 text-xs">
+                                  <span>{statusInfo.icon}</span>
+                                  {statusInfo.text}
+                                </Badge>
+                                <span className="text-sm text-muted-foreground">
+                                  {formatCriteria(subscription.criteria_type, subscription.criteria)}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  {subscription.notification_count}/6 התראות
+                                </span>
+                              </div>
+                              
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  onClick={() => toggleSubscriptionExpansion(subscription.id)}
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 px-2 text-xs"
+                                >
+                                  {isExpanded ? 'הסתר' : 'הצג'}
+                                </Button>
+                                <Button
+                                  onClick={() => handleDeleteSubscription(subscription.id)}
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 px-2 text-xs text-destructive hover:bg-destructive/10"
+                                >
+                                  מחק
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Expanded Details for inactive */}
+                          {isExpanded && (
+                            <div className="p-4 border-t border-border">
+                              <div className="space-y-3 text-sm">
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">סטטוס</span>
+                                  <span className="font-medium">{statusInfo.description}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">נוצר</span>
+                                  <span className="font-medium">{formatDate(subscription.created_at)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">התראה אחרונה</span>
+                                  <span className="font-medium">
+                                    {subscription.last_notified ? formatDate(subscription.last_notified) : 'אף פעם'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      </main>
 
       {/* Footer */}
       <div className="border-t border-border mt-12">

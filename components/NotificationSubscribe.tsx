@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DatePicker, DateRangePicker } from '@/components/ui/date-picker';
+import { Badge } from '@/components/ui/badge';
 
 interface NotificationSubscribeProps {
   notifyEmail: string;
@@ -15,6 +16,7 @@ interface NotificationSubscribeProps {
   notifyLoading: boolean;
   notifyStatus: string | null;
   onSubmit: (e: React.FormEvent) => void;
+  subscribedEmail?: string;
 }
 
 // Email validation regex
@@ -31,9 +33,54 @@ export default function NotificationSubscribe({
   setNotifyDateRange,
   notifyLoading,
   notifyStatus,
-  onSubmit
+  onSubmit,
+  subscribedEmail
 }: NotificationSubscribeProps) {
   const [isEmailValid, setIsEmailValid] = useState(false);
+  const [savedEmails, setSavedEmails] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      let emails: any = [];
+      try {
+        emails = JSON.parse(localStorage.getItem('ramel_saved_emails') || '[]');
+      } catch {
+        emails = [];
+      }
+      setSavedEmails(Array.isArray(emails) ? emails : []);
+    }
+  }, []);
+
+  const saveEmail = (email: string) => {
+    if (!email) return;
+    setSavedEmails(prev => {
+      if (prev.includes(email)) return prev;
+      const updated = [email, ...prev].slice(0, 10);
+      localStorage.setItem('ramel_saved_emails', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  useEffect(() => {
+    if (subscribedEmail && !savedEmails.includes(subscribedEmail)) {
+      saveEmail(subscribedEmail);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subscribedEmail]);
+
+  const removeEmail = (email: string) => {
+    setSavedEmails(prev => {
+      const updated = prev.filter(e => e !== email);
+      localStorage.setItem('ramel_saved_emails', JSON.stringify(updated));
+      return updated;
+    });
+    if (notifyEmail === email) setNotifyEmail('');
+  };
+
+  const handleBadgeClick = (email: string) => {
+    setNotifyEmail(email);
+    setIsEmailValid(emailRegex.test(email));
+  };
 
   const handleEmailChange = (email: string) => {
     setNotifyEmail(email);
@@ -42,12 +89,10 @@ export default function NotificationSubscribe({
 
   const handleSingleDateChange = (date: Date | undefined) => {
     setNotifyDate(date);
-    // Auto-close functionality will be handled by the DatePicker component
   };
 
   const handleDateRangeChange = (range: {from?: Date, to?: Date}) => {
     setNotifyDateRange(range);
-    // Auto-close functionality will be handled by the DateRangePicker component
   };
 
   return (
@@ -63,7 +108,6 @@ export default function NotificationSubscribe({
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} className="stack-sm" dir="rtl">
-          {/* Email Field with Enhanced Validation */}
           <div className="form-group">
             <label htmlFor="email-input" className="block text-sm font-medium text-right mb-1">
               כתובת המייל שלך
@@ -109,8 +153,33 @@ export default function NotificationSubscribe({
               </span>
             )}
           </div>
-          
-          {/* Date Selection Type Toggle */}
+          {savedEmails.length > 0 && (
+            <div className="flex flex-wrap gap-2 min-h-[32px] w-full justify-start flex-row-reverse items-center" dir="ltr">
+              {savedEmails.map(email => (
+                <Badge
+                  key={email}
+                  variant={notifyEmail === email ? 'secondary' : 'default'}
+                  className="cursor-pointer group pr-1.5"
+                  title={notifyEmail === email ? 'נבחר' : 'השתמש במייל זה'}
+                  onClick={() => handleBadgeClick(email)}
+                  tabIndex={0}
+                  aria-label={`השתמש במייל ${email}`}
+                >
+                  <span className="select-none">{email}</span>
+                  <button
+                    type="button"
+                    aria-label="הסר מייל זה"
+                    title="הסר מייל זה"
+                    className="ml-1 text-base font-bold text-muted-foreground hover:text-destructive focus:text-destructive focus:bg-destructive/10 hover:bg-destructive/10 rounded-full px-1 py-0.5 transition-colors duration-150"
+                    style={{ background: 'none', border: 'none', padding: 0, margin: 0, cursor: 'pointer', minWidth: 24, minHeight: 24, lineHeight: '20px' }}
+                    onClick={e => { e.stopPropagation(); removeEmail(email); }}
+                  >
+                    ×
+                  </button>
+                </Badge>
+              ))}
+            </div>
+          )}
           <div className="mt-4">
             <label className="block text-sm font-medium text-right mb-2">
               איך אתה רוצה לחפש?
@@ -149,8 +218,6 @@ export default function NotificationSubscribe({
               </Button>
             </div>
           </div>
-          
-          {/* Date Picker with Auto-close */}
           <div className="mt-3">
             <label className="block text-sm font-medium text-right mb-2">
               {notifyType === 'single' ? 'באיזה תאריך אתה זמין?' : 'באיזה טווח תאריכים אתה זמין?'}
@@ -184,8 +251,6 @@ export default function NotificationSubscribe({
               </>
             )}
           </div>
-          
-          {/* Submit Button */}
           <Button
             type="submit"
             className="w-full mt-4 bg-primary hover:bg-primary/90 text-primary-foreground"
@@ -207,10 +272,8 @@ export default function NotificationSubscribe({
               </>
             )}
           </Button>
-          
-          {/* Status Message */}
           {notifyStatus && (
-                          <div className={`text-sm text-center mt-3 p-3 rounded-xl backdrop-blur-sm ${notifyStatus.startsWith('✓') ? 'bg-secondary/10 text-foreground border border-secondary/20' : 'bg-muted text-muted-foreground border border-border'}`}>
+            <div className={`text-sm text-center mt-3 p-3 rounded-xl backdrop-blur-sm ${notifyStatus.startsWith('✓') ? 'bg-secondary/10 text-foreground border border-secondary/20' : 'bg-muted text-muted-foreground border border-border'}`}>
               {notifyStatus}
             </div>
           )}
