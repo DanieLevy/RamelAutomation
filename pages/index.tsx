@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { Calendar as CalendarIcon, Clock, Search, Smartphone, Wifi, WifiOff, Share2, Copy, Download, MapPin, ExternalLink } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Search, Smartphone, Wifi, WifiOff, Share2, Copy, Download, MapPin, ExternalLink, Settings, Bell } from 'lucide-react';
 import { ThemeToggle } from '../components/ui/theme-toggle';
 import PWABanner from '../components/PWABanner';
 import CachedResults from '../components/CachedResults';
@@ -726,6 +726,14 @@ ${availableResults.length} תאריכים זמינים
             <div className="flex items-center gap-2">
               <ThemeToggle />
               <button
+                onClick={() => router.push('/manage')}
+                className="p-2 rounded-full hover:bg-muted text-muted-foreground"
+                aria-label="ניהול התראות"
+                title="ניהול התראות"
+              >
+                <Bell className="w-5 h-5" />
+              </button>
+              <button
                 onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}
                 className="text-[10px] bg-background hover:bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground border border-border/30 transition-colors"
                 aria-label="חזרה למעלה"
@@ -759,7 +767,17 @@ ${availableResults.length} תאריכים זמינים
               </div>
             </div>
             
-            <ThemeToggle className="w-7 h-7" />
+            <div className="flex items-center gap-2">
+              <ThemeToggle className="w-7 h-7" />
+              <button
+                onClick={() => router.push('/manage')}
+                className="p-2 rounded-full hover:bg-muted text-muted-foreground"
+                aria-label="ניהול התראות"
+                title="ניהול התראות"
+              >
+                <Bell className="w-5 h-5" />
+              </button>
+            </div>
           </div>
           
           <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent mb-3"></div>
@@ -806,23 +824,6 @@ ${availableResults.length} תאריכים זמינים
           formatTimeIsrael={formatTimeIsrael}
           generateBookingUrl={generateBookingUrl}
         />
-        
-                  <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button onClick={checkAppointments} disabled={loading} className="px-8 py-3 text-lg">
-              {loading ? 'מחפש...' : 'חפש תורים'}
-            </Button>
-            
-            <Button 
-              onClick={() => router.push('/manage')} 
-              variant="outline" 
-              className="px-8 py-3 text-lg gap-2"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-              נהל התראות
-            </Button>
-          </div>
         
         {/* Footer */}
         <div className="mt-8 mb-4 opacity-80 hover:opacity-100 transition-opacity">

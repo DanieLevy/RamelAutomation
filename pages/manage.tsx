@@ -6,11 +6,23 @@ import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Separator } from '../components/ui/separator';
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose
+} from '../components/ui/dialog';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
+
+const LOCAL_STORAGE_TOKEN_KEY = 'ramel_management_token';
 
 interface NotificationData {
   id: string;
@@ -55,22 +67,30 @@ export default function ManagePage() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [expandedSubscriptions, setExpandedSubscriptions] = useState<Set<string>>(new Set());
   const [tokenValidated, setTokenValidated] = useState(false);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [selectedSubscription, setSelectedSubscription] = useState<NotificationData | null>(null);
 
   useEffect(() => {
+    // If token is in URL, validate and store it
     if (token && typeof token === 'string') {
-      // Token-based access - validate token first
-      validateTokenAndLoadData(token);
+      validateTokenAndLoadData(token, true);
     } else if (email && typeof email === 'string') {
       // Legacy email-based access (deprecated)
       setSearchEmail(email);
       setUserEmail(email);
       loadSubscriptions(email);
     } else {
-      setLoading(false);
+      // No token in URL, check localStorage for a valid token
+      const storedToken = typeof window !== 'undefined' ? localStorage.getItem(LOCAL_STORAGE_TOKEN_KEY) : null;
+      if (storedToken) {
+        validateTokenAndLoadData(storedToken, false);
+      } else {
+        setLoading(false);
+      }
     }
   }, [email, token]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const validateTokenAndLoadData = async (managementToken: string) => {
+  const validateTokenAndLoadData = async (managementToken: string, saveToStorage: boolean) => {
     try {
       setLoading(true);
       setError(null);
@@ -83,6 +103,10 @@ export default function ManagePage() {
         .single();
 
       if (tokenError || !tokenData) {
+        // If invalid, clear from localStorage
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(LOCAL_STORAGE_TOKEN_KEY);
+        }
         setError('קישור לא תקין או פג תוקף. אנא בקש קישור חדש.');
         setLoading(false);
         return;
@@ -92,9 +116,17 @@ export default function ManagePage() {
       const now = new Date();
       const expiresAt = new Date(tokenData.expires_at);
       if (now > expiresAt) {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(LOCAL_STORAGE_TOKEN_KEY);
+        }
         setError('קישור פג תוקף. אנא בקש קישור חדש.');
         setLoading(false);
         return;
+      }
+
+      // Save valid token to localStorage if requested
+      if (saveToStorage && typeof window !== 'undefined') {
+        localStorage.setItem(LOCAL_STORAGE_TOKEN_KEY, managementToken);
       }
 
       // Mark token as used
@@ -113,6 +145,9 @@ export default function ManagePage() {
       await loadSubscriptions(tokenData.email);
 
     } catch (error) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(LOCAL_STORAGE_TOKEN_KEY);
+      }
       console.error('Token validation error:', error);
       setError('שגיאה בטעינת הנתונים. אנא נסה שוב.');
       setLoading(false);
@@ -584,7 +619,10 @@ export default function ManagePage() {
                         {/* Actions */}
                         <div className="flex gap-2 pt-4 border-t border-border mt-4">
                           <Button
-                            onClick={() => router.push(`/unsubscribe?token=${subscription.unsubscribe_token}`)}
+                            onClick={() => {
+                              setSelectedSubscription(subscription);
+                              setDetailsDialogOpen(true);
+                            }}
                             variant="outline"
                             size="sm"
                             className="gap-2"
@@ -594,7 +632,6 @@ export default function ManagePage() {
                             </svg>
                             פרטים מלאים
                           </Button>
-                          
                           {subscription.criteria_type === 'range' && subscription.criteria?.start && (
                             <Button
                               onClick={() => {
@@ -710,6 +747,47 @@ export default function ManagePage() {
           © 2024 מספרת רם-אל • מערכת התראות אוטומטית
         </div>
       </div>
+
+      <Dialog open={detailsDialogOpen} onOpenChange={setDetailsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>פרטי הרשמה</DialogTitle>
+            <DialogDescription>
+              כל הפרטים והפעולות עבור הרשמה זו.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedSubscription && (
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">קריטריונים</span>
+                <span className="font-medium">{formatCriteria(selectedSubscription.criteria_type, selectedSubscription.criteria)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">התראות שנשלחו</span>
+                <span className="font-medium">{selectedSubscription.notification_count} מתוך 6</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">התראה אחרונה</span>
+                <span className="font-medium">{selectedSubscription.last_notified ? formatDate(selectedSubscription.last_notified) : 'אף פעם'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">עודכן לאחרונה</span>
+                <span className="font-medium">{formatDate(selectedSubscription.updated_at)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">סטטוס</span>
+                <span className="font-medium">{getStatusInfo(selectedSubscription.status).description}</span>
+              </div>
+              {/* Add more details or actions here as needed */}
+            </div>
+          )}
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">סגור</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 
