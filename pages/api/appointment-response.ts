@@ -1,10 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_ANON_KEY!
-);
+const supabase = supabaseAdmin;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -76,19 +74,85 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({
         success: true,
         action: 'taken',
-        message: 'Great! Your subscription has been marked as completed. You will receive no more notifications.',
+        message: 'מצוין! ההרשמה שלך סומנה כהושלמה. לא תקבל עוד התראות.',
         appointmentDate: appointmentResponse.appointment_date,
         appointmentTimes: appointmentResponse.appointment_times
       });
     }
 
-    // If user marked as "not wanted", continue with subscription
-    return res.status(200).json({
-      success: true,
-      action: 'not_wanted',
-      message: 'Got it! We\'ll continue searching for other available appointments and won\'t notify you about this specific date again.',
-      appointmentDate: appointmentResponse.appointment_date
-    });
+    // If user marked as "not wanted", add each specific time to ignored list
+    if (action === 'not_wanted') {
+      // Find all pending appointments for this notification
+      const { data: allPendingAppointments, error: fetchError } = await supabase
+        .from('user_appointment_responses')
+        .select('appointment_date, appointment_times')
+        .eq('notification_id', appointmentResponse.notification_id)
+        .eq('response_status', 'pending');
+
+      if (fetchError) {
+        console.error('Failed to fetch pending appointments:', fetchError);
+        return res.status(500).json({ error: 'Failed to process response' });
+      }
+
+      // Create ignored entries for all appointments in the current email
+      const ignoredEntries: Array<{
+        notification_id: string;
+        appointment_date: string;
+        appointment_time: string;
+        ignored_at: string;
+      }> = [];
+      if (allPendingAppointments) {
+        allPendingAppointments.forEach((apt: any) => {
+          const appointmentTimes = apt.appointment_times || [];
+          appointmentTimes.forEach((time: string) => {
+            ignoredEntries.push({
+              notification_id: appointmentResponse.notification_id,
+              appointment_date: apt.appointment_date,
+              appointment_time: time,
+              ignored_at: now
+            });
+          });
+        });
+      }
+
+      // Insert ignored appointments (with conflict handling)
+      if (ignoredEntries.length > 0) {
+        const { error: ignoreError } = await supabase
+          .from('ignored_appointments')
+          .upsert(ignoredEntries, {
+            onConflict: 'notification_id,appointment_date,appointment_time'
+          });
+
+        if (ignoreError) {
+          console.error('Failed to add ignored appointments:', ignoreError);
+          // Don't fail the request, just log the error
+        } else {
+          console.log(`📝 Added ${ignoredEntries.length} ignored appointments for all pending appointments`);
+        }
+      }
+
+      // Mark all pending appointments as not_wanted
+      const { error: bulkUpdateError } = await supabase
+        .from('user_appointment_responses')
+        .update({
+          response_status: 'not_wanted',
+          responded_at: now,
+          updated_at: now
+        })
+        .eq('notification_id', appointmentResponse.notification_id)
+        .eq('response_status', 'pending');
+
+      if (bulkUpdateError) {
+        console.error('Failed to update all pending appointments:', bulkUpdateError);
+      }
+
+      return res.status(200).json({
+        success: true,
+        action: 'not_wanted',
+        message: 'הבנו! נמשיך לחפש תורים זמינים אחרים ולא נתריעה על התורים הספציפיים האלה שוב.',
+        totalIgnored: ignoredEntries.length
+      });
+    }
 
   } catch (error) {
     console.error('Appointment response error:', error);

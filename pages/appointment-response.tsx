@@ -1,188 +1,182 @@
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import { ThemeToggle } from '../components/ui/theme-toggle';
-import { Card } from '../components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
+import Head from 'next/head';
 
-interface ResponseState {
-  success: boolean;
-  action?: 'taken' | 'not_wanted';
-  message?: string;
-  appointmentDate?: string;
-  appointmentTimes?: string[];
-  error?: string;
-}
+type ResponseStatus = 'loading' | 'success' | 'error' | 'invalid';
 
-export default function AppointmentResponse() {
+export default function AppointmentResponsePage() {
   const router = useRouter();
   const { token, action } = router.query;
-  const [responseState, setResponseState] = useState<ResponseState | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<ResponseStatus>('loading');
+  const [message, setMessage] = useState('');
+  const [details, setDetails] = useState<any>(null);
 
   useEffect(() => {
-    if (token && action && ['taken', 'not_wanted'].includes(action as string)) {
-      handleResponse(token as string, action as string);
-    }
+    if (!token || !action) return;
+
+    handleResponse(token as string, action as string);
   }, [token, action]);
 
-  const handleResponse = async (response_token: string, userAction: string) => {
-    setLoading(true);
+  const handleResponse = async (responseToken: string, responseAction: string) => {
     try {
+      setStatus('loading');
+      
       const response = await fetch('/api/appointment-response', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          response_token,
-          action: userAction
-        })
+          response_token: responseToken,
+          action: responseAction
+        }),
       });
 
       const data = await response.json();
-      setResponseState(data);
+
+      if (response.ok && data.success) {
+        setStatus('success');
+        setMessage(data.message);
+        setDetails(data);
+      } else {
+        setStatus('error');
+        setMessage(data.error || 'אירעה שגיאה בעיבוד התגובה');
+      }
     } catch (error) {
-      setResponseState({
-        success: false,
-        error: 'Failed to process your response. Please try again.'
-      });
-    } finally {
-      setLoading(false);
+      console.error('Response error:', error);
+      setStatus('error');
+      setMessage('אירעה שגיאה בחיבור לשרת');
+    }
+  };
+
+  const getStatusIcon = () => {
+    switch (status) {
+      case 'loading':
+        return '⏳';
+      case 'success':
+        return details?.action === 'taken' ? '✅' : '📝';
+      case 'error':
+        return '❌';
+      case 'invalid':
+        return '⚠️';
+      default:
+        return '📧';
+    }
+  };
+
+  const getStatusTitle = () => {
+    switch (status) {
+      case 'loading':
+        return 'מעבד את התגובה...';
+      case 'success':
+        return details?.action === 'taken' ? 'תור נקבע בהצלחה!' : 'התגובה נרשמה בהצלחה!';
+      case 'error':
+        return 'אירעה שגיאה';
+      case 'invalid':
+        return 'קישור לא תקין';
+      default:
+        return 'תגובה על תור';
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      <div className="absolute top-4 right-4">
-        <ThemeToggle />
-      </div>
-      
-      <div className="container mx-auto px-4 py-16">
-        <div className="max-w-2xl mx-auto">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-              🎯 תור רם-אל
-            </h1>
-            <p className="text-gray-600 dark:text-gray-300">
-              תגובה להתראת תור
-            </p>
+    <>
+      <Head>
+        <title>תגובה על תור - Tor-RamEl</title>
+        <meta name="description" content="תגובה על התראת תור במספרת רם-אל" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="icon" href="/favicon.ico" />
+      </Head>
+
+      <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-primary/5">
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-3xl font-bold text-primary">Tor-RamEl</h1>
+            <ThemeToggle />
           </div>
 
-          <Card className="p-8">
-            {loading && (
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                <p className="text-gray-600 dark:text-gray-300">מעבד את התגובה שלך...</p>
-              </div>
-            )}
+          <div className="max-w-2xl mx-auto">
+            <Card className="shadow-xl border-0 bg-card/80 backdrop-blur-sm">
+              <CardHeader className="text-center pb-4">
+                <div className="text-6xl mb-4">{getStatusIcon()}</div>
+                <CardTitle className="text-2xl">{getStatusTitle()}</CardTitle>
+                {status === 'loading' && (
+                  <CardDescription>
+                    אנא המתן בזמן שאנו מעבדים את התגובה שלך...
+                  </CardDescription>
+                )}
+              </CardHeader>
 
-            {!loading && responseState && (
-              <div className="text-center">
-                {responseState.success ? (
-                  <>
-                    <div className="mb-6">
-                      {responseState.action === 'taken' ? (
-                        <div className="w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <span className="text-2xl">✅</span>
-                        </div>
-                      ) : (
-                        <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <span className="text-2xl">🔍</span>
-                        </div>
-                      )}
-                    </div>
+              <CardContent className="text-center">
+                {status === 'loading' && (
+                  <div className="flex justify-center items-center py-8">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                  </div>
+                )}
 
-                    <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
-                      {responseState.action === 'taken' ? 'מעולה!' : 'הבנו!'}
-                    </h2>
-
-                    <p className="text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">
-                      {responseState.message}
-                    </p>
-
-                    {responseState.appointmentDate && (
-                      <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 mb-6">
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                          תאריך התור:
-                        </p>
-                        <p className="font-semibold text-gray-900 dark:text-white">
-                          {responseState.appointmentDate}
-                        </p>
-                        {responseState.appointmentTimes && responseState.appointmentTimes.length > 0 && (
-                          <>
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-3 mb-2">
-                              שעות זמינות:
-                            </p>
-                            <p className="font-semibold text-gray-900 dark:text-white">
-                              {responseState.appointmentTimes.join(', ')}
-                            </p>
-                          </>
+                {status === 'success' && (
+                  <div className="space-y-4">
+                    <div className="text-lg">{message}</div>
+                    
+                    {details?.action === 'taken' && (
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-green-800">
+                        <div className="font-semibold mb-2">🎉 מעולה!</div>
+                        <div>ההרשמה שלך להתראות הסתיימה. לא תקבל עוד התראות על תורים.</div>
+                        {details.appointmentDate && (
+                          <div className="mt-2 text-sm">
+                            תאריך התור: {details.appointmentDate}
+                          </div>
                         )}
                       </div>
                     )}
 
-                    {responseState.action === 'taken' && (
-                      <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-6">
-                        <p className="text-green-800 dark:text-green-200 text-sm">
-                          💡 <strong>זכור:</strong> עליך להזמין את התור באתר של המספרה. 
-                          המערכת שלנו רק מוצאת תורים זמינים ומודיעה לך עליהם.
-                        </p>
+                    {details?.action === 'not_wanted' && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-blue-800">
+                        <div className="font-semibold mb-2">📝 התגובה נרשמה</div>
+                        <div>נמשיך לחפש תורים אחרים עבורך ולא נתריע על התורים הספציפיים האלה שוב.</div>
+                        {details.totalIgnored && (
+                          <div className="mt-2 text-sm">
+                            סה&quot;כ {details.totalIgnored} תורים נוספו לרשימת המתעלמים
+                          </div>
+                        )}
                       </div>
                     )}
-                  </>
-                ) : (
-                  <>
-                    <div className="w-16 h-16 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <span className="text-2xl">❌</span>
-                    </div>
-                    <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
-                      שגיאה
-                    </h2>
-                    <p className="text-red-600 dark:text-red-400 mb-6">
-                      {responseState.error || 'אירעה שגיאה בעיבוד התגובה'}
-                    </p>
-                  </>
+                  </div>
                 )}
 
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                {status === 'error' && (
+                  <div className="space-y-4">
+                    <div className="text-lg text-destructive">{message}</div>
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800">
+                      <div>ייתכן שהקישור פג תוקף או שכבר השתמשת בו.</div>
+                      <div className="mt-2">תוכל לנהל את ההתראות שלך בעמוד הניהול.</div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-4 justify-center mt-8">
                   <Button 
                     onClick={() => router.push('/')}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    חזור לעמוד הראשי
-                  </Button>
-                  <Button 
-                    onClick={() => router.push('/manage')}
                     variant="outline"
                   >
-                    נהל התראות
+                    🏠 חזור לעמוד הראשי
+                  </Button>
+                  
+                  <Button 
+                    onClick={() => router.push('/manage')}
+                    variant="default"
+                  >
+                    🔧 ניהול התראות
                   </Button>
                 </div>
-              </div>
-            )}
-
-            {!loading && !responseState && (token || action) && (
-              <div className="text-center">
-                <div className="w-16 h-16 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="text-2xl">❌</span>
-                </div>
-                <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
-                  קישור לא תקין
-                </h2>
-                <p className="text-gray-600 dark:text-gray-300 mb-6">
-                  הקישור שלחצת עליו אינו תקין או פג תוקפו.
-                </p>
-                <Button 
-                  onClick={() => router.push('/')}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  חזור לעמוד הראשי
-                </Button>
-              </div>
-            )}
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 } 

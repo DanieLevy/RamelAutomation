@@ -335,12 +335,29 @@ const generateEmailStyles = (): string => `
     }
 
     .response-title {
-      font-size: 16px;
+      font-size: 18px;
       font-weight: 600;
-      color: #374151;
+      color: #1f2937;
+      margin-bottom: 16px;
       text-align: center;
-      margin: 0 0 20px 0;
-      letter-spacing: 0.2px;
+    }
+
+    .response-subtitle {
+      font-size: 14px;
+      color: #6b7280;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .response-note {
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 16px;
+      padding: 12px;
+      background: #f9fafb;
+      border-radius: 8px;
+      border-right: 3px solid #d1d5db;
+      text-align: right;
     }
 
     .response-buttons {
@@ -643,8 +660,8 @@ ${matchingResults.map(apt => `
           ${notificationCount === 0 ? 'הנה התורים הפנויים שמצאנו עבורך במספרת רם-אל' : 'מהרו לתפוס את התורים לפני שנגמרים'}
         </p>
         <div class="appointment-grid">
-          ${matchingResults.map(appointment => {
-            const responseToken = responseTokens[appointment.date];
+          ${matchingResults.map((appointment, index) => {
+            const responseToken = responseTokens ? responseTokens[appointment.date] : null;
             return `
             <div class="appointment-item">
               <div class="date-section">
@@ -662,23 +679,28 @@ ${matchingResults.map(apt => `
                   📅 לקביעת תור מיידית
                 </a>
               </div>
-              ${responseToken ? `
-              <div class="response-section">
-                <div class="response-title">האם התור הזה מתאים לך?</div>
-                <div class="response-buttons">
-                  <a href="https://tor-ramel.netlify.app/appointment-response?token=${responseToken}&action=taken" class="response-button success">
-                    ✅ כן, לוקח!
-                  </a>
-                  <a href="https://tor-ramel.netlify.app/appointment-response?token=${responseToken}&action=not_wanted" class="response-button neutral">
-                    ❌ לא מתאים
-                  </a>
-                </div>
-              </div>
-              ` : ''}
             </div>
             `;
           }).join('')}
         </div>
+        
+        ${matchingResults.length > 0 && responseTokens && Object.keys(responseTokens).length > 0 ? `
+        <div class="response-section">
+          <div class="response-title">האם אחד מהתורים האלה מתאים לך?</div>
+          <div class="response-subtitle">לחץ על הבחירה המתאימה עבורך:</div>
+          <div class="response-buttons">
+            <a href="https://tor-ramel.netlify.app/appointment-response?token=${Object.values(responseTokens)[0]}&action=taken" class="response-button success">
+              ✅ כן, לוקח!
+            </a>
+            <a href="https://tor-ramel.netlify.app/appointment-response?token=${Object.values(responseTokens)[0]}&action=not_wanted" class="response-button neutral">
+              ❌ לא מתאים
+            </a>
+          </div>
+          <div class="response-note">
+            <strong>שימו לב:</strong> אם תבחרו "לא מתאים", לא נשלח לכם התראות על התורים הספציפיים האלה שוב, אבל נמשיך לחפש תורים אחרים עבורכם.
+          </div>
+        </div>
+        ` : ''}
       </div>
       <div class="footer">
         <p class="footer-email">נשלח אל ${userEmail}</p>

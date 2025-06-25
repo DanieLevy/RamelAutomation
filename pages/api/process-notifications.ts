@@ -230,25 +230,50 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             console.log(`📧 🧪 TEST MODE: Bypassing rate limit for ${notification.email}`);
           }
 
-          // Filter out appointments that user has marked as "not_wanted"
-          const { data: rejectedAppointments } = await supabase
-            .from('user_appointment_responses')
-            .select('appointment_date')
-            .eq('notification_id', currentNotification.id)
-            .eq('response_status', 'not_wanted');
+          // Filter out appointments based on ignored appointments table
+          console.log(`📧 Filtering appointments for ${notification.email} - checking ignored list...`);
+          
+          // Get ignored appointments for this notification
+          const { data: ignoredAppointments, error: ignoredError } = await supabase
+            .from('ignored_appointments')
+            .select('appointment_date, appointment_time')
+            .eq('notification_id', notification.id);
 
-          const rejectedDates = new Set(rejectedAppointments?.map(r => r.appointment_date) || []);
-          
-          // Filter matching results to exclude rejected appointments
-          const filteredResults = matchingResults.filter(apt => !rejectedDates.has(apt.date));
-          
+          if (ignoredError) {
+            console.error(`Failed to fetch ignored appointments for ${notification.email}:`, ignoredError);
+          }
+
+          // Create a set of ignored combinations for fast lookup
+          const ignoredSet = new Set();
+          if (ignoredAppointments) {
+            ignoredAppointments.forEach(ignored => {
+              ignoredSet.add(`${ignored.appointment_date}:${ignored.appointment_time}`);
+            });
+          }
+
+          // Filter matching results to exclude ignored appointments
+          const filteredResults = matchingResults.map(appointment => {
+            // Filter out times that are specifically ignored
+            const availableTimes = appointment.times.filter(time => {
+              const key = `${appointment.date}:${time}`;
+              return !ignoredSet.has(key);
+            });
+            
+            return {
+              ...appointment,
+              times: availableTimes
+            };
+          }).filter(appointment => appointment.times.length > 0); // Keep only appointments with available times
+
+          // Check if any appointments remain after filtering
           if (filteredResults.length === 0) {
-            console.log(`📧 All appointments rejected by user for ${notification.email}`);
+            console.log(`📧 All appointments ignored by user for ${notification.email}`);
             emailsSkipped++;
             continue;
           }
 
-          console.log(`📧 Found ${filteredResults.length} new appointments for ${notification.email} (${rejectedDates.size} rejected)`);
+          console.log(`📧 Found ${filteredResults.length} appointments after filtering ignored times for ${notification.email}`);
+          console.log(`📧 Ignored ${ignoredSet.size} specific appointment times`);
 
           // Use filtered results for email content
           matchingResults = filteredResults;

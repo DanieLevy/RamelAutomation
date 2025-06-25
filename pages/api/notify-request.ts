@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { addDays, format, isValid, parse, parseISO } from 'date-fns';
 import nodemailer from 'nodemailer';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { generateConfirmationEmailTemplate } from '@/lib/emailTemplates';
+import { generateWelcomeEmailTemplate } from '@/lib/emailTemplates';
 
 const supabase = supabaseAdmin;
 
@@ -161,6 +161,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   // Send confirmation email
   try {
+    console.log(`📧 Sending confirmation email to ${email}`);
+    
     // Create email transporter
     const transporter = nodemailer.createTransport({
       service: 'gmail',
@@ -170,41 +172,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
     });
 
-    // Generate confirmation email
-    const confirmationEmail = generateConfirmationEmailTemplate({
+    // Generate welcome email
+    const welcomeEmail = generateWelcomeEmailTemplate({
       userEmail: email,
-      appointmentDate: criteria_type === 'single' ? criteria.date : '',
-      appointmentTime: '',
-      unsubscribeUrl: `https://tor-ramel.netlify.app/unsubscribe?token=${unsubscribe_token}`
+      unsubscribeUrl: `https://tor-ramel.netlify.app/unsubscribe?token=${unsubscribe_token}`,
+      manageUrl: 'https://tor-ramel.netlify.app/manage'
     });
 
     // Send confirmation email
-    const emailResult = await transporter.sendMail({
-      from: `"תור רם-אל" <${process.env.EMAIL_SENDER}>`,
+    await transporter.sendMail({
+      from: `"תורים לרם-אל" <${process.env.EMAIL_SENDER}>`,
       to: email,
-      subject: confirmationEmail.subject,
-      html: confirmationEmail.html,
-      text: confirmationEmail.text,
-      headers: {
-        'X-Priority': '3',
-        'X-MSMail-Priority': 'Normal'
-      }
+      subject: welcomeEmail.subject,
+      text: welcomeEmail.text,
+      html: welcomeEmail.html
     });
 
-    console.log(`📧 ✅ Confirmation email sent to ${email}: ${emailResult.messageId}`);
-    
-    // Close transporter
+    console.log(`📧 ✅ Confirmation email sent to ${email}`);
     transporter.close();
-
-  } catch (emailError: any) {
-    console.error(`📧 ❌ Failed to send confirmation email to ${email}:`, emailError.message);
-    // Don't fail the entire request if confirmation email fails
+    
+  } catch (emailError) {
+    console.error(`📧 ❌ Failed to send confirmation email to ${email}:`, emailError);
+    // Don't fail the subscription request if email fails
   }
-  
-  return res.status(200).json({ 
+
+  // Return success response
+  const responseMessage = criteria_type === 'single' 
+    ? `ההרשמה התקבלה! נתחיל לחפש תור עבורך בתאריך ${criteria.date}. תקבל התראה ברגע שנמצא תור פנוי.`
+    : `ההרשמה התקבלה! נתחיל לחפש תורים עבורך בטווח ${criteria.start} עד ${criteria.end}. תקבל התראה ברגע שנמצאו תורים פנויים.`;
+
+  return res.status(200).json({
     success: true,
-    message: criteria.adjusted 
-      ? `נרשמת בהצלחה להתראה! שים לב: טווח התאריכים הוגבל ל-${maxRangeDays} ימים. נשלח לך מייל אישור.`
-      : 'נרשמת בהצלחה להתראה! נשלח לך מייל אישור.'
+    message: responseMessage
   });
 } 
