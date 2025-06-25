@@ -24,20 +24,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Find the appointment response record
+    // Find the appointment response record (now batch)
     const { data: appointmentResponse, error: findError } = await supabase
       .from('user_appointment_responses')
-      .select(`
-        *,
-        notifications!inner(*)
-      `)
+      .select('*')
       .eq('response_token', response_token)
-      .eq('response_status', 'pending')
       .single();
 
     if (findError || !appointmentResponse) {
       return res.status(404).json({ 
         error: 'Invalid or expired response token' 
+      });
+    }
+
+    if (appointmentResponse.response_status !== 'pending') {
+      return res.status(400).json({
+        error: 'Response already processed for this batch.'
       });
     }
 
@@ -75,46 +77,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         success: true,
         action: 'taken',
         message: 'מצוין! ההרשמה שלך סומנה כהושלמה. לא תקבל עוד התראות.',
-        appointmentDate: appointmentResponse.appointment_date,
+        appointmentDates: appointmentResponse.appointment_dates,
         appointmentTimes: appointmentResponse.appointment_times
       });
     }
 
-    // If user marked as "not wanted", add each specific time to ignored list
+    // If user marked as "not wanted", add each specific time to ignored list (for all in batch)
     if (action === 'not_wanted') {
-      // Find all pending appointments for this notification
-      const { data: allPendingAppointments, error: fetchError } = await supabase
-        .from('user_appointment_responses')
-        .select('appointment_date, appointment_times')
-        .eq('notification_id', appointmentResponse.notification_id)
-        .eq('response_status', 'pending');
-
-      if (fetchError) {
-        console.error('Failed to fetch pending appointments:', fetchError);
-        return res.status(500).json({ error: 'Failed to process response' });
-      }
-
-      // Create ignored entries for all appointments in the current email
       const ignoredEntries: Array<{
         notification_id: string;
         appointment_date: string;
         appointment_time: string;
         ignored_at: string;
       }> = [];
-      if (allPendingAppointments) {
-        allPendingAppointments.forEach((apt: any) => {
-          const appointmentTimes = apt.appointment_times || [];
-          appointmentTimes.forEach((time: string) => {
+      if (appointmentResponse.appointment_dates && appointmentResponse.appointment_times) {
+        appointmentResponse.appointment_dates.forEach((date: string) => {
+          const times = appointmentResponse.appointment_times[date] || [];
+          times.forEach((time: string) => {
             ignoredEntries.push({
               notification_id: appointmentResponse.notification_id,
-              appointment_date: apt.appointment_date,
+              appointment_date: date,
               appointment_time: time,
               ignored_at: now
             });
           });
         });
       }
-
       // Insert ignored appointments (with conflict handling)
       if (ignoredEntries.length > 0) {
         const { error: ignoreError } = await supabase
@@ -122,30 +110,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           .upsert(ignoredEntries, {
             onConflict: 'notification_id,appointment_date,appointment_time'
           });
-
         if (ignoreError) {
           console.error('Failed to add ignored appointments:', ignoreError);
-          // Don't fail the request, just log the error
         } else {
-          console.log(`📝 Added ${ignoredEntries.length} ignored appointments for all pending appointments`);
+          console.log(`📝 Added ${ignoredEntries.length} ignored appointments for batch`);
         }
       }
-
-      // Mark all pending appointments as not_wanted
-      const { error: bulkUpdateError } = await supabase
-        .from('user_appointment_responses')
-        .update({
-          response_status: 'not_wanted',
-          responded_at: now,
-          updated_at: now
-        })
-        .eq('notification_id', appointmentResponse.notification_id)
-        .eq('response_status', 'pending');
-
-      if (bulkUpdateError) {
-        console.error('Failed to update all pending appointments:', bulkUpdateError);
-      }
-
       return res.status(200).json({
         success: true,
         action: 'not_wanted',

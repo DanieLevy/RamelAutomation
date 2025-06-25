@@ -40,6 +40,8 @@ export const generateAppointmentNotificationEmail = (
   
   const baseUrl = process.env.DEPLOY_URL || 'https://tor-ramel.netlify.app';
   
+  const token = responseTokens && responseTokens.batch ? responseTokens.batch : null;
+  
   const html = `
     <!DOCTYPE html>
     <html dir="rtl" lang="he">
@@ -260,11 +262,11 @@ export const generateAppointmentNotificationEmail = (
               אם לא מתאים - לחץ "לא מתאים" ונמשיך לחפש
             </div>
             <div class="buttons">
-              ${responseTokens && Object.keys(responseTokens).length > 0 ? `
-                <a href="${baseUrl}/appointment-response?token=${Object.values(responseTokens)[0]}&action=taken" class="btn btn-yes">
+              ${token ? `
+                <a href="${baseUrl}/appointment-response?token=${token}&action=taken" class="btn btn-yes">
                   🎯 מצאתי!
                 </a>
-                <a href="${baseUrl}/appointment-response?token=${Object.values(responseTokens)[0]}&action=not_wanted" class="btn btn-no">
+                <a href="${baseUrl}/appointment-response?token=${token}&action=not_wanted" class="btn btn-no">
                   😕 לא מתאים
                 </a>
               ` : ''}
@@ -297,9 +299,9 @@ ${matchingResults.map(appointment => `
 `).join('')}
 
 מה תחליט?
-${responseTokens && Object.keys(responseTokens).length > 0 ? `
-🎯 מצאתי! ${baseUrl}/appointment-response?token=${Object.values(responseTokens)[0]}&action=taken
-😕 לא מתאים: ${baseUrl}/appointment-response?token=${Object.values(responseTokens)[0]}&action=not_wanted
+${token ? `
+🎯 מצאתי! ${baseUrl}/appointment-response?token=${token}&action=taken
+😕 לא מתאים: ${baseUrl}/appointment-response?token=${token}&action=not_wanted
 ` : ''}
 
 📵 הפסק התראות: ${baseUrl}/unsubscribe?token=${encodeURIComponent(subscriberEmail)}

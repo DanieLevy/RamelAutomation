@@ -19,7 +19,7 @@ export default function AppointmentResponsePage() {
   useEffect(() => {
     if (!token || !action) return;
 
-    handleResponse(token as string, action as string);
+      handleResponse(token as string, action as string);
   }, [token, action]);
 
   const handleResponse = async (responseToken: string, userAction: string) => {
@@ -60,7 +60,7 @@ export default function AppointmentResponsePage() {
   const renderSuccessContent = () => {
     if (!details) return null;
 
-    return (
+  return (
       <div className="space-y-6">
         {/* Success Message */}
         <div className={`rounded-xl p-6 text-center ${
@@ -72,7 +72,7 @@ export default function AppointmentResponsePage() {
             details.action === 'taken' ? 'text-green-600' : 'text-blue-600'
           }`}>
             {details.action === 'taken' ? '🎉' : '👍'}
-          </div>
+      </div>
           <h2 className={`text-xl font-bold mb-2 ${
             details.action === 'taken' ? 'text-green-800' : 'text-blue-800'
           }`}>
@@ -82,8 +82,8 @@ export default function AppointmentResponsePage() {
             details.action === 'taken' ? 'text-green-700' : 'text-blue-700'
           }`}>
             {message}
-          </p>
-        </div>
+            </p>
+          </div>
 
         {/* Action-specific content */}
         {details.action === 'taken' && (
@@ -123,7 +123,7 @@ export default function AppointmentResponsePage() {
                     🏠 חזור לאתר לחיפוש חדש
                   </Button>
                 </Link>
-              </div>
+                        </div>
             </CardContent>
           </Card>
         )}
@@ -153,7 +153,7 @@ export default function AppointmentResponsePage() {
                     <span>כשנמצא תורים חדשים, תקבל התראה חדשה</span>
                   </li>
                 </ul>
-              </div>
+                    </div>
 
               {/* Show ignored appointments if available */}
               {details.totalIgnored && details.totalIgnored > 0 && (
@@ -163,12 +163,12 @@ export default function AppointmentResponsePage() {
                     <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">
                       {details.totalIgnored} תורים הוסרו
                     </Badge>
-                  </div>
+                      </div>
                   <p className="text-sm text-blue-600">
                     התורים הספציפיים שהוצגו לך במייל האחרון לא יופיעו יותר בחיפושים עתידיים
-                  </p>
-                </div>
-              )}
+                        </p>
+                      </div>
+                    )}
 
               <div className="bg-white rounded-lg p-4 border border-blue-200">
                 <h3 className="font-semibold text-blue-800 mb-2">⚙️ רוצה לשנות את החיפוש?</h3>
@@ -179,12 +179,12 @@ export default function AppointmentResponsePage() {
                   <Link href="/" className="flex-1">
                     <Button variant="outline" className="w-full border-blue-300 text-blue-700 hover:bg-blue-100">
                       🔍 חפש תאריכים אחרים
-                    </Button>
+                  </Button>
                   </Link>
                   <Link href="/manage" className="flex-1">
                     <Button variant="outline" className="w-full border-blue-300 text-blue-700 hover:bg-blue-100">
                       ⚙️ נהל התראות
-                    </Button>
+                  </Button>
                   </Link>
                 </div>
               </div>
@@ -310,8 +310,8 @@ export default function AppointmentResponsePage() {
                   נהל התראות
                 </Link>
               </p>
-            </div>
-          </div>
+              </div>
+        </div>
         </footer>
       </div>
     </>
