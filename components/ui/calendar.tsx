@@ -180,7 +180,15 @@ function CalendarDayButton({
     if (modifiers.focused) ref.current?.focus()
   }, [modifiers.focused])
 
-  return (
+  // Determine if today
+  const isToday = modifiers.today;
+  // Determine if closed
+  const isClosed = modifiers.closed;
+  // Determine if this is the start of a range and only start is selected
+  const isRangeStartOnly = modifiers.range_start && !modifiers.range_end && !modifiers.range_middle && !modifiers.selected && modifiers.from && !modifiers.to;
+
+  // Tooltip for closed days
+  const button = (
     <Button
       ref={ref}
       variant="ghost"
@@ -196,13 +204,43 @@ function CalendarDayButton({
       data-range-end={modifiers.range_end}
       data-range-middle={modifiers.range_middle}
       className={cn(
+        // Today styling
+        isToday && !modifiers.selected &&
+          "border-2 border-primary bg-accent/40 text-primary-700 dark:text-primary-300",
+        // Closed day styling
+        isClosed &&
+          "relative after:content-[''] after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2 after:w-1.5 after:h-1.5 after:rounded-full after:bg-red-500",
+        // Selected styling
+        modifiers.selected &&
+          "bg-primary text-primary-foreground border-primary border-2",
+        // Range styling (keep as before)
         "data-[selected-single=true]:bg-primary data-[selected-single=true]:text-primary-foreground data-[range-middle=true]:bg-accent data-[range-middle=true]:text-accent-foreground data-[range-start=true]:bg-primary data-[range-start=true]:text-primary-foreground data-[range-end=true]:bg-primary data-[range-end=true]:text-primary-foreground group-data-[focused=true]/day:border-ring group-data-[focused=true]/day:ring-ring/50 flex aspect-square h-auto w-full min-w-[--cell-size] flex-col gap-1 font-normal leading-none data-[range-end=true]:rounded-md data-[range-middle=true]:rounded-none data-[range-start=true]:rounded-md group-data-[focused=true]/day:relative group-data-[focused=true]/day:z-10 group-data-[focused=true]/day:ring-[3px] [&>span]:text-xs [&>span]:opacity-70",
+        // Range start only highlight
+        isRangeStartOnly && "ring-2 ring-primary ring-offset-2 ring-offset-background border-2 border-primary bg-primary/10",
         defaultClassNames.day,
         className
       )}
       {...props}
-    />
-  )
+    >
+      {props.children}
+      {/* Show a badge or dot for range start only */}
+      {isRangeStartOnly && (
+        <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-primary animate-pulse" title="בחרת התחלה"></span>
+      )}
+    </Button>
+  );
+
+  if (isClosed) {
+    return (
+      <span className="group relative">
+        {button}
+        <span className="pointer-events-none absolute z-20 left-1/2 -translate-x-1/2 top-full mt-1 whitespace-nowrap rounded bg-destructive px-2 py-0.5 text-xs text-white opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+          סגור
+        </span>
+      </span>
+    );
+  }
+  return button;
 }
 
 export { Calendar, CalendarDayButton }

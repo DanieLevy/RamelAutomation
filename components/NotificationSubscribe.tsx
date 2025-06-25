@@ -222,33 +222,62 @@ export default function NotificationSubscribe({
             <label className="block text-sm font-medium text-right mb-2">
               {notifyType === 'single' ? 'באיזה תאריך אתה זמין?' : 'באיזה טווח תאריכים אתה זמין?'}
             </label>
-            {notifyType === 'single' ? (
-              <DatePicker 
-                date={notifyDate}
-                onDateChange={handleSingleDateChange}
-                placeholder="בחר תאריך"
-                autoClose={true}
-              />
-            ) : (
-              <>
-                <DateRangePicker
-                  dateRange={notifyDateRange}
-                  onDateRangeChange={handleDateRangeChange}
-                  placeholder="בחר טווח תאריכים"
-                  autoClose={true}
-                />
-                {notifyDateRange.from && notifyDateRange.to && (
-                  <div className="flex items-center bg-primary/10 border border-primary/20 rounded-xl px-3 py-2 mt-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-2 text-primary">
-                      <path d="M12 22c5.5 0 10-4.5 10-10S17.5 2 12 2 2 6.5 2 12s4.5 10 10 10z"></path>
-                      <path d="M12 8v4l3 3"></path>
-                    </svg>
-                    <span className="text-xs text-primary/80">
-                      חיפוש חכם - המערכת מאתרת מועד בטווח שבחרת
-                    </span>
-                  </div>
-                )}
-              </>
+            <div className="flex items-center gap-2">
+              {notifyType === 'single' ? (
+                <>
+                  <DatePicker 
+                    date={notifyDate}
+                    onDateChange={handleSingleDateChange}
+                    placeholder="בחר תאריך"
+                    autoClose={true}
+                  />
+                  {notifyDate && (
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="ml-1 text-muted-foreground hover:text-destructive"
+                      title="נקה בחירה"
+                      aria-label="נקה בחירה"
+                      onClick={() => setNotifyDate(undefined)}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </Button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <DateRangePicker
+                    dateRange={notifyDateRange}
+                    onDateRangeChange={handleDateRangeChange}
+                    placeholder="בחר טווח תאריכים"
+                  />
+                  {(notifyDateRange.from || notifyDateRange.to) && (
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="ml-1 text-muted-foreground hover:text-destructive"
+                      title="נקה בחירה"
+                      aria-label="נקה בחירה"
+                      onClick={() => setNotifyDateRange({})}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
+            {notifyDateRange.from && notifyDateRange.to && (
+              <div className="flex items-center bg-primary/10 border border-primary/20 rounded-xl px-3 py-2 mt-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-2 text-primary">
+                  <path d="M12 22c5.5 0 10-4.5 10-10S17.5 2 12 2 2 6.5 2 12s4.5 10 10 10z"></path>
+                  <path d="M12 8v4l3 3"></path>
+                </svg>
+                <span className="text-xs text-primary/80">
+                  חיפוש חכם - המערכת מאתרת מועד בטווח שבחרת
+                </span>
+              </div>
             )}
           </div>
           <Button

@@ -34,6 +34,12 @@ export function DatePicker({
 }: DatePickerProps) {
   const [open, setOpen] = React.useState(false)
 
+  // Disable Mondays (1) and Saturdays (6)
+  const isClosedDay = (date: Date) => {
+    const day = date.getDay();
+    return day === 1 || day === 6;
+  };
+
   const handleDateChange = (selectedDate: Date | undefined) => {
     onDateChange?.(selectedDate)
     if (autoClose && selectedDate) {
@@ -82,7 +88,6 @@ interface DateRangePickerProps {
   className?: string
   disabled?: boolean
   placeholder?: string
-  autoClose?: boolean
 }
 
 export function DateRangePicker({
@@ -91,16 +96,21 @@ export function DateRangePicker({
   className,
   disabled,
   placeholder = "בחר טווח תאריכים",
-  autoClose = false,
 }: DateRangePickerProps) {
   const [open, setOpen] = React.useState(false)
 
   const handleDateRangeChange = (range: DateRange | undefined) => {
     if (range) {
+      // If user picks the same day twice, reset the range
+      if (range.from && range.to && range.from.getTime() === range.to.getTime()) {
+        onDateRangeChange({ from: range.from });
+        setOpen(true); // keep open for new selection
+        return;
+      }
       onDateRangeChange(range);
-      // Auto-close when both dates are selected
-      if (autoClose && range.from && range.to) {
-        setOpen(false)
+      // Only close when both from and to are set and not the same day
+      if (range.from && range.to && range.from.getTime() !== range.to.getTime()) {
+        setOpen(false);
       }
     }
   }
