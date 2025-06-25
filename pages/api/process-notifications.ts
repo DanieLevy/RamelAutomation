@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import nodemailer from 'nodemailer';
-import { generateModernEmailTemplate } from '@/lib/emailTemplates';
+import { generateAppointmentNotificationEmail } from '@/lib/emailTemplates';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 // ============================================================================
@@ -324,16 +324,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }
           }
 
-          // Generate modern email content using the new template system
-          const emailContent = generateModernEmailTemplate({
+          // Generate modern email content using the enhanced template system
+          const emailContent = generateAppointmentNotificationEmail(
             matchingResults,
-            notificationCount: currentNotifCount,
-            unsubscribeUrl: `https://tor-ramel.netlify.app/unsubscribe?token=${currentNotification.unsubscribe_token}`,
-            userEmail: currentNotification.email,
-            criteriaType: currentNotification.criteria_type as 'single' | 'range',
             responseTokens,
-            notificationId: currentNotification.id
-          });
+            currentNotifCount + 1, // Current phase (1-6)
+            6, // Max phases
+            currentNotification.email
+          );
 
           const mailOptions = {
             from: `"תורים לרם-אל" <${process.env.EMAIL_SENDER}>`,

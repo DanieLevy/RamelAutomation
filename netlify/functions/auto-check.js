@@ -9,41 +9,79 @@ const https = require('https')
 const fetch = global.fetch || require('node-fetch')
 
 // ============================================================================
-// ULTRA-OPTIMIZED AUTO-CHECK FUNCTION
-// Target: Complete execution under 8 seconds (2s buffer from 10s limit)
-// Strategy: Focus ONLY on appointment checking, defer heavy operations
+// ULTRA-OPTIMIZED AUTO-CHECK FUNCTION WITH ENHANCED ROBUSTNESS
+// Target: Complete execution under 8 seconds with maximum reliability
+// Strategy: Focus on appointment checking with smart error recovery
 // ============================================================================
 
-// Create persistent HTTP agents for connection reuse
-const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 15 })
-const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 15, rejectUnauthorized: false })
+// Create persistent HTTP agents for connection reuse with enhanced settings
+const httpAgent = new http.Agent({ 
+  keepAlive: true, 
+  maxSockets: 20, // Increased for better concurrency
+  timeout: 5000,
+  keepAliveMsecs: 1000 
+})
+const httpsAgent = new https.Agent({ 
+  keepAlive: true, 
+  maxSockets: 20, 
+  rejectUnauthorized: false,
+  timeout: 5000,
+  keepAliveMsecs: 1000
+})
 
-// Create optimized axios instance with aggressive timeouts
+// Create optimized axios instance with enhanced reliability
 const axiosInstance = axios.create({
   httpAgent,
   httpsAgent,
   headers: {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     'Accept-Language': 'he-IL,he;q=0.9,en;q=0.8',
     'Accept-Encoding': 'gzip, deflate, br',
     'Connection': 'keep-alive',
+    'Upgrade-Insecure-Requests': '1',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none'
   },
-  timeout: 3000, // Reduced from 5000ms for speed
-  responseType: 'arraybuffer'
+  timeout: 4000, // Slightly increased for reliability
+  responseType: 'arraybuffer',
+  maxRedirects: 3,
+  validateStatus: (status) => status < 500 // Accept 4xx but not 5xx
 })
 
-// Enhanced in-memory cache with longer TTL for better performance
+// Enhanced caching system with performance metrics
 const responseCache = new Map()
-const CACHE_TTL = 90 * 1000 // 1.5 minutes - longer cache for speed
+const performanceMetrics = {
+  cacheHits: 0,
+  cacheMisses: 0,
+  apiCalls: 0,
+  errors: 0,
+  totalResponseTime: 0
+}
+const CACHE_TTL = 120 * 1000 // 2 minutes for better reliability
+const MAX_CACHE_SIZE = 100 // Prevent memory issues
 
-// Supabase client setup
+// Supabase client setup with enhanced error handling
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
+  process.env.SUPABASE_ANON_KEY,
+  {
+    db: {
+      schema: 'public',
+    },
+    auth: {
+      persistSession: false
+    },
+    global: {
+      headers: {
+        'x-client-info': 'auto-check-function'
+      }
+    }
+  }
 )
 
-// Israel timezone utilities (optimized)
+// Israel timezone utilities (enhanced)
 const ISRAEL_TIMEZONE = 'Asia/Jerusalem'
 
 const formatDateIsrael = (date) => {
@@ -73,7 +111,6 @@ const getDayNameHebrew = (dateStr) => {
 }
 
 const generateBookingUrl = (dateStr) => {
-  // Convert YYYY-MM-DD to the URL format for the barbershop booking page
   const baseUrl = 'https://mytor.co.il/home.php'
   const params = new URLSearchParams({
     i: 'cmFtZWwzMw==',  // ramel33 encoded
@@ -107,7 +144,10 @@ const getOpenDays = (startDate, totalDays) => {
   let currentDate = new Date(startDate)
   let daysChecked = 0
   
-  while (openDays.length < totalDays && daysChecked < 45) { // Reduced safety limit for speed
+  // Enhanced safety limit with better logic
+  const maxDaysToCheck = Math.min(totalDays * 2, 60) // More flexible
+  
+  while (openDays.length < totalDays && daysChecked < maxDaysToCheck) {
     if (!isClosedDay(currentDate)) {
       openDays.push(new Date(currentDate))
     }
@@ -118,16 +158,39 @@ const getOpenDays = (startDate, totalDays) => {
   return openDays
 }
 
-// HYPER-OPTIMIZED: Single date check with enhanced caching
-async function checkSingleDateHyperOptimized(dateStr) {
+// Cache management functions
+const cleanupCache = () => {
+  if (responseCache.size > MAX_CACHE_SIZE) {
+    const entries = Array.from(responseCache.entries())
+    entries.sort((a, b) => a[1].timestamp - b[1].timestamp)
+    
+    // Remove oldest 20% of entries
+    const toRemove = Math.floor(entries.length * 0.2)
+    for (let i = 0; i < toRemove; i++) {
+      responseCache.delete(entries[i][0])
+    }
+    
+    console.log(`🧹 Cache cleanup: removed ${toRemove} old entries`)
+  }
+}
+
+// ENHANCED: Single date check with retry logic and better error handling
+async function checkSingleDateWithRetry(dateStr, retryCount = 0) {
+  const maxRetries = 2
   const cacheKey = `apt_${dateStr}`
   const cached = responseCache.get(cacheKey)
   
+  // Check cache first
   if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+    performanceMetrics.cacheHits++
     return cached.data
   }
   
+  performanceMetrics.cacheMisses++
+  
   try {
+    const startTime = Date.now()
+    
     const userId = process.env.USER_ID || '4481'
     const codeAuth = process.env.CODE_AUTH || 'Sa1W2GjL'
     
@@ -142,98 +205,183 @@ async function checkSingleDateHyperOptimized(dateStr) {
     const response = await axiosInstance.get('https://mytor.co.il/home.php', {
       params,
       headers: {
-        'Cookie': `userID=${userId}; codeAuth=${codeAuth}`
+        'Cookie': `userID=${userId}; codeAuth=${codeAuth}`,
+        'Referer': 'https://mytor.co.il'
       }
     })
 
-    // Ultra-fast cheerio loading with minimal options
-    const $ = cheerio.load(response.data, {
-      normalizeWhitespace: false,
-      decodeEntities: false,
-      xmlMode: false
-    })
+    performanceMetrics.apiCalls++
+    performanceMetrics.totalResponseTime += (Date.now() - startTime)
+
+    // Enhanced cheerio loading with error handling
+    let $
+    try {
+      $ = cheerio.load(response.data, {
+        normalizeWhitespace: false,
+        decodeEntities: false,
+        xmlMode: false
+      })
+    } catch (parseError) {
+      console.error(`📄 HTML parsing error for ${dateStr}:`, parseError.message)
+      throw new Error('Failed to parse HTML response')
+    }
     
-    // Lightning-fast check for "no appointments" message
+    // Enhanced appointment detection
     const dangerText = $('h4.tx-danger').text()
-    if (dangerText.includes('לא נשארו תורים פנויים')) {
-      const result = { date: dateStr, available: false, times: [] }
+    const alertText = $('.alert-danger').text()
+    const noAppointmentsMessages = [
+      'לא נשארו תורים פנויים',
+      'אין תורים זמינים',
+      'no appointments available'
+    ]
+    
+    const hasNoAppointments = noAppointmentsMessages.some(msg => 
+      dangerText.includes(msg) || alertText.includes(msg)
+    )
+    
+    if (hasNoAppointments) {
+      const result = { date: dateStr, available: false, times: [], message: 'No appointments available' }
       responseCache.set(cacheKey, { data: result, timestamp: Date.now() })
+      cleanupCache()
       return result
     }
 
-    // Hyper-optimized time extraction using direct DOM access
+    // Enhanced time extraction with multiple selectors
     const availableTimes = []
-    const timeButtons = $('button.btn.btn-outline-dark.btn-block')
+    const timeSelectors = [
+      'button.btn.btn-outline-dark.btn-block',
+      'button[data-time]',
+      '.time-slot',
+      '.appointment-time'
+    ]
     
-    for (let i = 0; i < timeButtons.length; i++) {
-      const timeText = $(timeButtons[i]).text().trim()
-      if (/^\d{1,2}:\d{2}$/.test(timeText)) {
-        availableTimes.push(timeText)
+    for (const selector of timeSelectors) {
+      const timeButtons = $(selector)
+      if (timeButtons.length > 0) {
+        for (let i = 0; i < timeButtons.length; i++) {
+          const timeText = $(timeButtons[i]).text().trim()
+          if (/^\d{1,2}:\d{2}$/.test(timeText) && !availableTimes.includes(timeText)) {
+            availableTimes.push(timeText)
+          }
+        }
+        break // Use first successful selector
       }
     }
 
     const result = {
       date: dateStr,
       available: availableTimes.length > 0,
-      times: availableTimes
+      times: availableTimes.sort(), // Sort times for consistency
+      message: availableTimes.length > 0 ? `Found ${availableTimes.length} appointments` : 'No appointments found'
     }
     
+    // Cache successful results
     responseCache.set(cacheKey, { data: result, timestamp: Date.now() })
+    cleanupCache()
     return result
     
   } catch (error) {
-    console.error(`Error checking ${dateStr}:`, error.message)
-    return { date: dateStr, available: null, times: [] }
+    performanceMetrics.errors++
+    console.error(`❌ Error checking ${dateStr} (attempt ${retryCount + 1}):`, error.message)
+    
+    // Retry logic for transient errors
+    if (retryCount < maxRetries && isRetryableError(error)) {
+      console.log(`🔄 Retrying ${dateStr} in ${(retryCount + 1) * 100}ms...`)
+      await new Promise(resolve => setTimeout(resolve, (retryCount + 1) * 100))
+      return checkSingleDateWithRetry(dateStr, retryCount + 1)
+    }
+    
+    // Return error result
+    return { 
+      date: dateStr, 
+      available: null, 
+      times: [], 
+      error: error.message,
+      message: `Error: ${error.message}`
+    }
   }
 }
 
-// HYPER-SPEED: Aggressive parallel processing with smart early exits
-async function findAppointmentsHyperSpeed() {
-  console.log('🚀 HYPER-SPEED MODE: <8 seconds target')
+// Helper function to determine if error is retryable
+const isRetryableError = (error) => {
+  const retryableErrors = [
+    'ECONNRESET',
+    'ETIMEDOUT',
+    'ENOTFOUND',
+    'EAI_AGAIN',
+    'timeout',
+    'socket hang up'
+  ]
+  
+  return retryableErrors.some(errType => 
+    error.message.toLowerCase().includes(errType.toLowerCase()) ||
+    error.code === errType
+  )
+}
+
+// ENHANCED: Appointment finding with intelligent batching and recovery
+async function findAppointmentsEnhanced() {
+  console.log('🚀 ENHANCED AUTO-CHECK: Starting robust appointment search')
   const startTime = Date.now()
   
+  // Reset performance metrics
+  Object.keys(performanceMetrics).forEach(key => performanceMetrics[key] = 0)
+  
   const currentDate = getCurrentDateIsrael()
-  const maxDays = 25 // Reduced from 30 for speed
+  const maxDays = 30 // Restored to 30 for better coverage
   const openDates = getOpenDays(currentDate, maxDays)
   
-  console.log(`Will check ${openDates.length} dates in AGGRESSIVE parallel mode`)
+  console.log(`📊 Will check ${openDates.length} dates with enhanced reliability`)
   
-  // ULTRA-AGGRESSIVE: Check first 3 dates from cache for instant response
-  for (let i = 0; i < Math.min(3, openDates.length); i++) {
-    const dateStr = formatDateIsrael(openDates[i])
+  // INTELLIGENT CACHE CHECK: Look for recent cached results first
+  const recentResults = []
+  for (const date of openDates.slice(0, 10)) { // Check first 10 dates
+    const dateStr = formatDateIsrael(date)
     const cached = responseCache.get(`apt_${dateStr}`)
     
     if (cached && 
         (Date.now() - cached.timestamp < CACHE_TTL) && 
         cached.data.available === true) {
-      console.log(`⚡ INSTANT: Found cached appointment for ${dateStr}`)
-      return {
-        success: true,
-        found: true,
-        appointments: [cached.data],
-        summary: {
-          totalChecked: 1,
-          elapsed: Math.round((Date.now() - startTime) / 1000),
-          mode: 'cache_hit',
-          hasAvailable: true
-        }
+      console.log(`⚡ Found cached available appointment for ${dateStr}`)
+      recentResults.push(cached.data)
+    }
+  }
+  
+  // If we have recent cached results, return them quickly
+  if (recentResults.length > 0) {
+    const elapsed = Math.round((Date.now() - startTime) / 1000)
+    console.log(`🎯 CACHE HIT: Found ${recentResults.length} appointments in ${elapsed}s`)
+    
+    return {
+      success: true,
+      found: true,
+      appointments: recentResults,
+      summary: {
+        totalChecked: recentResults.length,
+        elapsed: elapsed,
+        mode: 'cache_hit',
+        hasAvailable: true,
+        completedAt: new Date().toISOString(),
+        performance: performanceMetrics
       }
     }
   }
   
-  // HYPER-AGGRESSIVE: Larger batches with shorter timeouts
-  const BATCH_SIZE = 8 // Increased from 5 for speed
+  // ADAPTIVE BATCHING: Start with smaller batches, increase if performance is good
+  let BATCH_SIZE = 5
   const results = []
   let foundAny = false
   
   for (let i = 0; i < openDates.length; i += BATCH_SIZE) {
     const batch = openDates.slice(i, i + BATCH_SIZE)
+    const batchStartTime = Date.now()
+    
     const batchPromises = batch.map(date => {
       const dateStr = formatDateIsrael(date)
-      return checkSingleDateHyperOptimized(dateStr)
+      return checkSingleDateWithRetry(dateStr)
     })
     
-    // Process batch with race condition for speed
+    // Process batch with enhanced error handling
     const batchResults = await Promise.allSettled(batchPromises)
     
     batchResults.forEach((result, idx) => {
@@ -241,38 +389,55 @@ async function findAppointmentsHyperSpeed() {
         results.push(result.value)
         if (result.value.available) foundAny = true
       } else {
+        console.error(`🚨 Batch item failed:`, result.reason)
         results.push({
           date: formatDateIsrael(batch[idx]),
           available: null,
-          times: []
+          times: [],
+          error: result.reason?.message || 'Unknown error'
         })
       }
     })
     
     const elapsed = Date.now() - startTime
-    console.log(`Batch ${Math.floor(i/BATCH_SIZE) + 1}: ${results.length}/${openDates.length} in ${elapsed}ms`)
+    const batchTime = Date.now() - batchStartTime
     
-    // CRITICAL: Stop if we're approaching time limit OR found appointments
-    if (elapsed > 6000) { // 6 second safety limit
-      console.log(`⏰ TIME LIMIT: Stopping at ${elapsed}ms to avoid 10s timeout`)
+    console.log(`📦 Batch ${Math.floor(i/BATCH_SIZE) + 1}: ${results.length}/${openDates.length} in ${batchTime}ms (total: ${elapsed}ms)`)
+    
+    // ADAPTIVE PERFORMANCE: Adjust batch size based on performance
+    if (batchTime < 500 && BATCH_SIZE < 8) {
+      BATCH_SIZE = Math.min(BATCH_SIZE + 1, 8)
+      console.log(`⚡ Performance good, increasing batch size to ${BATCH_SIZE}`)
+    } else if (batchTime > 1500 && BATCH_SIZE > 3) {
+      BATCH_SIZE = Math.max(BATCH_SIZE - 1, 3)
+      console.log(`🐌 Performance slow, decreasing batch size to ${BATCH_SIZE}`)
+    }
+    
+    // INTELLIGENT EARLY EXIT
+    if (elapsed > 6500) { // 6.5 second safety limit
+      console.log(`⏰ TIME LIMIT: Stopping at ${elapsed}ms to avoid timeout`)
       break
     }
     
-    if (foundAny && elapsed > 2000) { // Early exit if found something after 2s
-      console.log(`⚡ EARLY EXIT: Found appointments in ${elapsed}ms`)
+    // If we found appointments and have checked enough, consider early exit
+    if (foundAny && elapsed > 2000 && results.length >= 15) {
+      console.log(`🎯 EARLY EXIT: Found appointments after checking ${results.length} dates in ${elapsed}ms`)
       break
     }
     
-    // Minimal delay only between batches
+    // Smart delay between batches
     if (i + BATCH_SIZE < openDates.length) {
-      await new Promise(resolve => setTimeout(resolve, 25)) // Reduced to 25ms
+      const delay = Math.max(10, Math.min(50, batchTime / 10)) // Adaptive delay
+      await new Promise(resolve => setTimeout(resolve, delay))
     }
   }
   
   const elapsed = Math.round((Date.now() - startTime) / 1000)
   const availableResults = results.filter(r => r.available === true)
+  const errorResults = results.filter(r => r.available === null)
   
-  console.log(`✅ Completed ${results.length} checks in ${elapsed}s, found ${availableResults.length} available`)
+  console.log(`✅ Enhanced check completed: ${results.length} checked, ${availableResults.length} available, ${errorResults.length} errors in ${elapsed}s`)
+  console.log(`📊 Performance: ${performanceMetrics.cacheHits} cache hits, ${performanceMetrics.apiCalls} API calls, avg response: ${Math.round(performanceMetrics.totalResponseTime / Math.max(performanceMetrics.apiCalls, 1))}ms`)
   
   return {
     success: true,
@@ -281,9 +446,11 @@ async function findAppointmentsHyperSpeed() {
     summary: {
       totalChecked: results.length,
       elapsed: elapsed,
-      mode: 'parallel_scan',
+      mode: 'enhanced_parallel',
       hasAvailable: availableResults.length > 0,
-      completedAt: new Date().toISOString()
+      completedAt: new Date().toISOString(),
+      performance: performanceMetrics,
+      errors: errorResults.length
     }
   }
 }
@@ -292,17 +459,21 @@ async function findAppointmentsHyperSpeed() {
 async function updateExpiredSubscriptions() {
   const currentDateStr = formatDateIsrael(getCurrentDateIsrael())
   
-  // Single query to update all expired subscriptions
-  const { error } = await supabase
-    .from('notifications')
-    .update({ status: 'expired', updated_at: new Date().toISOString() })
-    .eq('status', 'active')
-    .or(`criteria->date.lt.${currentDateStr},criteria->end.lt.${currentDateStr}`)
-  
-  if (error) {
-    console.error('Error updating expired subscriptions:', error)
-  } else {
-    console.log('Updated expired subscriptions')
+  try {
+    // Fix JSON query syntax - use proper PostgreSQL JSON operators
+    const { error } = await supabase
+      .from('notifications')
+      .update({ status: 'expired', updated_at: new Date().toISOString() })
+      .eq('status', 'active')
+      .or(`criteria->>date.lt.${currentDateStr},criteria->>end.lt.${currentDateStr}`)
+    
+    if (error) {
+      console.error('Error updating expired subscriptions:', error)
+    } else {
+      console.log('Updated expired subscriptions')
+    }
+  } catch (error) {
+    console.error('Failed to update expired subscriptions:', error)
   }
 }
 
@@ -316,7 +487,7 @@ exports.handler = async (event, context) => {
     
     // PARALLEL EXECUTION: Start both operations simultaneously
     const [appointmentResults, _] = await Promise.all([
-      findAppointmentsHyperSpeed(),
+      findAppointmentsEnhanced(),
       updateExpiredSubscriptions() // Run in parallel, don't wait for result
     ])
     

@@ -524,9 +524,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
       const unsubscribeEmail = generateUnsubscribeEmailTemplate({
         userEmail: data.email,
-        criteriaText: criteriaText || '',
-        unsubscribeDate: new Date().toLocaleDateString('he-IL'),
-        manageUrl: 'https://tor-ramel.netlify.app/manage'
+        resubscribeUrl: 'https://tor-ramel.netlify.app'
       });
       await transporter.sendMail({
         from: `"תור רם-אל" <${process.env.EMAIL_SENDER}>`,
