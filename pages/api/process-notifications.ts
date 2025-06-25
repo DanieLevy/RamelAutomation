@@ -278,50 +278,56 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           // Use filtered results for email content
           matchingResults = filteredResults;
 
-          // Create or update user appointment response with a single token for the whole batch
-          let responseToken: string | null = null;
-          try {
-            // Insert a single record for the whole batch
-            const { data: response, error: responseError } = await supabase
-              .from('user_appointment_responses')
-              .insert({
-                notification_id: currentNotification.id,
-                appointment_dates: matchingResults.map(a => a.date),
-                appointment_times: matchingResults.reduce((acc, a) => {
-                  acc[a.date] = a.times;
-                  return acc;
-                }, {} as Record<string, string[]>),
-                response_status: 'pending'
-              })
-              .select('response_token')
-              .single();
+          // Create or update user appointment responses with tokens
+          const responseTokens: { [key: string]: string } = {};
+          
+          for (const appointment of matchingResults) {
+            try {
+              // Optimistically attempt to insert the record.
+              // If it fails with a unique constraint violation (code 23505), it's a race condition.
+              // In that case, we can safely fetch the existing record.
+              const { data: response, error: responseError } = await supabase
+                .from('user_appointment_responses')
+                .insert({
+                  notification_id: currentNotification.id,
+                  appointment_date: appointment.date,
+                  appointment_times: appointment.times,
+                  response_status: 'pending'
+                })
+                .select('response_token')
+                .single();
 
-            if (responseError) {
-              if (responseError.code === '23505') { // Unique constraint violation
-                // Fetch existing token for this batch (should not happen in normal flow)
-                const { data: existingResponse, error: selectError } = await supabase
-                  .from('user_appointment_responses')
-                  .select('response_token')
-                  .eq('notification_id', currentNotification.id)
-                  .eq('response_status', 'pending')
-                  .single();
-                if (!selectError && existingResponse) {
-                  responseToken = existingResponse.response_token;
+              if (responseError) {
+                if (responseError.code === '23505') { // Unique constraint violation
+                  console.log(`📧 Race condition detected for ${appointment.date}. Fetching existing token.`);
+                  const { data: existingResponse, error: selectError } = await supabase
+                    .from('user_appointment_responses')
+                    .select('response_token')
+                    .eq('notification_id', currentNotification.id)
+                    .eq('appointment_date', appointment.date)
+                    .single();
+
+                  if (selectError) {
+                    console.error(`🚨 Failed to fetch token after race condition for ${appointment.date}:`, selectError);
+                  } else if (existingResponse) {
+                    responseTokens[appointment.date] = existingResponse.response_token;
+                  }
+                } else {
+                  // A different, unexpected error occurred
+                  console.error(`🚨 Failed to create response record for ${appointment.date}:`, responseError);
                 }
-              } else {
-                console.error(`🚨 Failed to create response record for batch:`, responseError);
+              } else if (response) {
+                responseTokens[appointment.date] = response.response_token;
               }
-            } else if (response) {
-              responseToken = response.response_token;
+            } catch (error) {
+              console.error(`🚨 Unhandled error managing response record for ${appointment.date}:`, error);
             }
-          } catch (error) {
-            console.error(`🚨 Unhandled error managing response record for batch:`, error);
           }
 
           // Generate modern email content using the enhanced template system
           const emailContent = generateAppointmentNotificationEmail(
             matchingResults,
-            responseToken ? { batch: responseToken } : null,
+            responseTokens,
             currentNotifCount + 1, // Current phase (1-6)
             6, // Max phases
             currentNotification.email

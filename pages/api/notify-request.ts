@@ -137,7 +137,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Create a unique unsubscribe token
   const unsubscribe_token = uuidv4();
   
-  // Insert into Supabase
+  // Prepare start and end dates for the enhanced system
+  let start_date: string;
+  let end_date: string;
+  
+  if (criteria_type === 'single') {
+    start_date = criteria.date;
+    end_date = criteria.date;
+  } else {
+    start_date = criteria.start;
+    end_date = criteria.end;
+  }
+
+  // Insert into Supabase (using only existing schema fields)
   const { error: insertError } = await supabase.from('notifications').insert([
     {
       email,
