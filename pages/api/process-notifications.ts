@@ -181,16 +181,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             currentNotification = freshNotification || notification;
           }
           
-          // Enhanced notification timing and constraints
+          // Custom notification timing and constraints
           const currentNotifCount = currentNotification.notification_count || 0;
-          const phaseCount = currentNotification.phase_count || 0;
-          const notificationPhase = currentNotification.notification_phase || 'initial';
+          const maxNotifications = currentNotification.max_notifications || 3; // Default to 3 if not set
+          const intervalMinutes = currentNotification.interval_minutes || 30; // Default to 30 minutes if not set
+          const notifyOnEveryNew = currentNotification.notify_on_every_new !== false; // Default to true
           const now = new Date();
           const lastNotified = currentNotification.last_notified ? new Date(currentNotification.last_notified) : null;
           const timeSinceLastNotification = lastNotified ? now.getTime() - lastNotified.getTime() : Infinity;
 
-          // Skip if max emails reached (6 total)
-          if (currentNotifCount >= 6) {
+          // Skip if max emails reached (based on user settings)
+          if (currentNotifCount >= maxNotifications) {
             await supabase
               .from('notifications')
               .update({ 
@@ -199,35 +200,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 updated_at: new Date().toISOString() 
               })
               .eq('id', notification.id);
-            console.log(`📧 Max emails reached for ${notification.email} - marking as max_reached`);
+            console.log(`📧 Max emails reached for ${notification.email} (${maxNotifications} emails) - marking as max_reached`);
             emailsSkipped++;
             continue;
           }
 
-          // Enhanced timing logic: First 3 emails: 10min apart, Next 3: 1hr apart
-          let requiredInterval;
-          if (currentNotifCount < 3) {
-            // First phase: 10 minutes between emails
-            requiredInterval = 10 * 60 * 1000; // 10 minutes
-          } else {
-            // Second phase: 1 hour between emails
-            requiredInterval = 60 * 60 * 1000; // 1 hour
-          }
+          // Use custom interval timing
+          const requiredInterval = intervalMinutes * 60 * 1000; // Convert minutes to milliseconds
           
           if (isTestMode) {
-            console.log(`📧 🧪 TEST: Processing email for ${currentNotification.email}, count: ${currentNotifCount}, phase: ${notificationPhase}`);
+            console.log(`📧 🧪 TEST: Processing email for ${currentNotification.email}, count: ${currentNotifCount}/${maxNotifications}, interval: ${intervalMinutes}min`);
           }
 
-          // Skip if too soon since last notification - unless in test mode
-          if (!isTestMode && timeSinceLastNotification < requiredInterval) {
+          // Skip if too soon since last notification - unless in test mode or interval is 0 (immediate)
+          if (!isTestMode && intervalMinutes > 0 && timeSinceLastNotification < requiredInterval) {
             const minutesRemaining = Math.ceil((requiredInterval - timeSinceLastNotification) / 60000);
-            console.log(`📧 Too soon for ${notification.email} (${minutesRemaining}m remaining)`);
+            console.log(`📧 Too soon for ${notification.email} (${minutesRemaining}m remaining, interval: ${intervalMinutes}m)`);
             emailsSkipped++;
             continue;
           }
           
           if (isTestMode && timeSinceLastNotification < requiredInterval) {
             console.log(`📧 🧪 TEST MODE: Bypassing rate limit for ${notification.email}`);
+          }
+          
+          if (intervalMinutes === 0) {
+            console.log(`📧 ⚡ Immediate notification enabled for ${notification.email} (no interval delay)`);
           }
 
           // Filter out appointments based on ignored appointments table
@@ -328,8 +326,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const emailContent = generateAppointmentNotificationEmail(
             matchingResults,
             responseTokens,
-            currentNotifCount + 1, // Current phase (1-6)
-            6, // Max phases
+            currentNotifCount + 1, // Current notification number
+            maxNotifications, // Max notifications based on user settings
             currentNotification.email
           );
 
@@ -345,28 +343,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           emailPromises.push(
             (async () => {
               try {
-                console.log(`📧 Sending email #${currentNotifCount + 1}/6 to ${currentNotification.email}`);
+                console.log(`📧 Sending email #${currentNotifCount + 1}/${maxNotifications} to ${currentNotification.email}`);
                 
                 // Send email
                 const emailResult = await transporter.sendMail(mailOptions);
                 console.log(`📧 ✅ Email sent successfully: ${emailResult.messageId}`);
                 
-                // Calculate new values with enhanced phase management
+                // Calculate new values based on user settings
                 const newNotificationCount = currentNotifCount + 1;
                 let newStatus = 'active';
-                let newPhase = notificationPhase;
-                let newPhaseCount = phaseCount;
 
-                // Determine phase and status
-                if (newNotificationCount >= 6) {
+                // Determine status based on user's max notifications setting
+                if (newNotificationCount >= maxNotifications) {
                   newStatus = 'max_reached';
-                  newPhase = 'completed';
-                } else if (newNotificationCount <= 3) {
-                  newPhase = 'initial';
-                  newPhaseCount = newNotificationCount;
-                } else {
-                  newPhase = 'extended';
-                  newPhaseCount = newNotificationCount - 3;
                 }
                 
                 // Track email history (non-blocking)
@@ -386,15 +375,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                   console.log('📧 ⚠️ Email history tracking failed (non-critical):', historyError instanceof Error ? historyError.message : 'Unknown error');
                 }
                 
-                // Update notification record with enhanced phase tracking
+                // Update notification record
                 const { error: updateError } = await supabase
                   .from('notifications')
                   .update({
                     last_notified: new Date().toISOString(),
                     notification_count: newNotificationCount,
                     status: newStatus,
-                    notification_phase: newPhase,
-                    phase_count: newPhaseCount,
                     updated_at: new Date().toISOString()
                   })
                   .eq('id', currentNotification.id);
@@ -404,12 +391,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                   throw new Error(`Database update failed: ${updateError.message}`);
                 }
                 
-                console.log(`📧 ✅ Sent email #${newNotificationCount} to ${currentNotification.email} (${newPhase} phase, status: ${newStatus})`);
+                console.log(`📧 ✅ Sent email #${newNotificationCount}/${maxNotifications} to ${currentNotification.email} (status: ${newStatus})`);
                 
                 if (newStatus === 'max_reached') {
-                  console.log(`🏁 Notification completed for ${currentNotification.email} - 6 emails sent`);
-                } else if (newPhase === 'extended' && newPhaseCount === 1) {
-                  console.log(`📧 🔄 ${currentNotification.email} entered extended phase - switching to 1hr intervals`);
+                  console.log(`🏁 Notification completed for ${currentNotification.email} - ${maxNotifications} emails sent (user limit reached)`);
+                } else {
+                  console.log(`📧 ⏰ Next notification for ${currentNotification.email} in ${intervalMinutes} minutes (if opportunities found)`);
                 }
                 
                 return { success: true, email: currentNotification.email, count: newNotificationCount, status: newStatus };

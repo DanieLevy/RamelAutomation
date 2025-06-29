@@ -20,11 +20,6 @@ interface ManualSearchProps {
   loading: boolean;
   results: AppointmentResult[];
   onCheckAppointments: () => void;
-  onShare: () => void;
-  formatDisplayDateIsrael: (dateStr: string) => string;
-  getDayNameHebrew: (dateStr: string) => string;
-  formatTimeIsrael: (time: string) => string;
-  generateBookingUrl: (dateStr: string) => string;
 }
 
 export default function ManualSearch({
@@ -34,12 +29,7 @@ export default function ManualSearch({
   setDays,
   loading,
   results,
-  onCheckAppointments,
-  onShare,
-  formatDisplayDateIsrael,
-  getDayNameHebrew,
-  formatTimeIsrael,
-  generateBookingUrl
+  onCheckAppointments
 }: ManualSearchProps) {
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
 
@@ -53,21 +43,71 @@ export default function ManualSearch({
     setExpandedDays(newExpanded);
   };
 
+  // Helper functions
+  const formatDisplayDateIsrael = (dateStr: string): string => {
+    const date = new Date(dateStr + 'T00:00:00');
+    return new Intl.DateTimeFormat('he-IL', {
+      timeZone: 'Asia/Jerusalem',
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    }).format(date);
+  };
+
+  const getDayNameHebrew = (dateStr: string): string => {
+    const date = new Date(dateStr + 'T00:00:00');
+    return new Intl.DateTimeFormat('he-IL', {
+      timeZone: 'Asia/Jerusalem',
+      weekday: 'long'
+    }).format(date);
+  };
+
+  const formatTimeIsrael = (time: string): string => {
+    return time;
+  };
+
+  const generateBookingUrl = (dateStr: string): string => {
+    const baseUrl = 'https://mytor.co.il/home.php';
+    const params = new URLSearchParams({
+      i: 'cmFtZWwzMw==',
+      s: 'MjY1',
+      mm: 'y',
+      lang: 'he',
+      datef: dateStr,
+      signup: 'הצג'
+    });
+    return `${baseUrl}?${params.toString()}`;
+  };
+
+  const handleShare = async () => {
+    const availableResults = results.filter(r => r.available === true);
+    if (availableResults.length === 0) return;
+
+    const shareText = `נמצאו ${availableResults.length} תורים זמינים במספרת רם-אל!\n\n${availableResults.map(r => 
+      `📅 ${formatDisplayDateIsrael(r.date)}\n⏰ ${r.times.join(', ')}\n🔗 ${generateBookingUrl(r.date)}`
+    ).join('\n\n')}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'תורים זמינים במספרת רם-אל',
+          text: shareText
+        });
+      } catch (error) {
+        console.log('Share cancelled');
+      }
+    } else {
+      navigator.clipboard.writeText(shareText);
+      alert('המידע הועתק ללוח');
+    }
+  };
+
   return (
-    <>
+    <div className="space-y-6">
       {/* Search Controls */}
-      <Card className="mb-6 overflow-hidden shadow-xl rounded-2xl border-0 backdrop-blur-sm bg-gradient-to-br from-background via-muted/5 to-secondary/5">
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-secondary via-primary to-accent"></div>
-        <CardHeader className="pt-6">
-          <CardTitle className="text-right text-xl font-bold">
-            🔍 חיפוש תורים זמינים
-          </CardTitle>
-          <CardDescription className="text-right">
-            מצא תור פנוי בזמן אמת 🎯
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="stack-sm">
-          <div className="flex gap-2">
+      <div className="space-y-4">
+        <div className="flex gap-2">
             <Button
               variant={searchMode === 'closest' ? 'default' : 'outline'}
               onClick={() => setSearchMode('closest')}
@@ -104,50 +144,46 @@ export default function ManualSearch({
               </SelectContent>
             </Select>
           )}
-        </CardContent>
-        <CardFooter>
-          <Button
-            onClick={onCheckAppointments}
-            disabled={loading}
-            className="w-full h-12 text-base font-medium bg-primary hover:bg-primary/90 text-primary-foreground"
-            size="lg"
-          >
-            {loading ? (
-              <div className="flex items-center gap-2">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                <span>{searchMode === 'closest' ? 'מחפש תור...' : 'בודק תורים...'}</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <Search className="h-5 w-5 ml-2" />
-                <span>{searchMode === 'closest' ? 'חפש תור קרוב' : 'בדוק תורים'}</span>
-              </div>
-            )}
-          </Button>
-        </CardFooter>
-      </Card>
+        
+        <Button
+          onClick={onCheckAppointments}
+          disabled={loading}
+          className="w-full h-12 text-base font-medium bg-primary hover:bg-primary/90 text-primary-foreground"
+          size="lg"
+        >
+          {loading ? (
+            <div className="flex items-center gap-2">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+              <span>{searchMode === 'closest' ? 'מחפש תור...' : 'בודק תורים...'}</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Search className="h-5 w-5 ml-2" />
+              <span>{searchMode === 'closest' ? 'חפש תור קרוב' : 'בדוק תורים'}</span>
+            </div>
+          )}
+        </Button>
+      </div>
       
       {/* Search Results */}
       {results.length > 0 && (
-        <Card className="mb-6 overflow-hidden shadow-xl rounded-2xl border-0 backdrop-blur-sm bg-gradient-to-br from-background to-primary/5">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary/80 to-accent/80"></div>
-          <CardHeader className="pb-2 pt-6">
-            <div className="flex items-center justify-between">
-              {results.filter(r => r.available === true).length > 0 && (
-                <Button 
-                  onClick={onShare}
-                  size="sm"
-                  variant="outline"
-                  className="border-primary/30 text-primary hover:text-primary hover:bg-primary/10 rounded-xl"
-                >
-                  <Share2 className="h-4 w-4 ml-1" />
-                  שתף
-                </Button>
-              )}
-              <CardTitle className="text-right text-lg font-bold">תוצאות חיפוש</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-bold">תוצאות חיפוש</h3>
+            {results.filter(r => r.available === true).length > 0 && (
+              <Button 
+                onClick={handleShare}
+                size="sm"
+                variant="outline"
+                className="border-primary/30 text-primary hover:text-primary hover:bg-primary/10 rounded-xl"
+              >
+                <Share2 className="h-4 w-4 ml-1" />
+                שתף
+              </Button>
+            )}
+          </div>
+          
+          <div>
             {results.filter(r => r.available === true).length > 0 ? (
               <div className="space-y-4">
                 <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary/10 text-foreground border border-secondary/20 text-sm font-medium">
@@ -272,9 +308,9 @@ export default function ManualSearch({
                 <div className="text-sm text-muted-foreground">נסה תאריכים אחרים או בדוק מאוחר יותר</div>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
-    </>
+    </div>
   );
 } 

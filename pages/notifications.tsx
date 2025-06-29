@@ -1,0 +1,223 @@
+import { useState, useEffect } from 'react';
+import Head from 'next/head';
+import { useRouter } from 'next/router';
+import { format } from 'date-fns';
+import NotificationSubscribe from '@/components/NotificationSubscribe';
+import OpportunityBanner from '@/components/OpportunityBanner';
+import BottomNavigation from '@/components/BottomNavigation';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { ArrowLeft, Bell, Wifi } from 'lucide-react';
+import OTPAuthenticator from '@/components/OTPAuthenticator';
+import AuthenticatedUserNav from '@/components/AuthenticatedUserNav';
+
+export default function NotificationsPage() {
+  const router = useRouter();
+  
+  // Notification form states
+  const [notifyEmail, setNotifyEmail] = useState('');
+  const [notifyType, setNotifyType] = useState<'single' | 'range'>('single');
+  const [notifyDate, setNotifyDate] = useState<Date | undefined>(undefined);
+  const [notifyDateRange, setNotifyDateRange] = useState<{from?: Date, to?: Date}>({from: undefined, to: undefined});
+  const [notifyLoading, setNotifyLoading] = useState(false);
+  const [notifyStatus, setNotifyStatus] = useState<string | null>(null);
+  const [subscribedEmail, setSubscribedEmail] = useState<string | undefined>(undefined);
+  
+  // Notification settings state
+  const [notifySettings, setNotifySettings] = useState({
+    maxNotifications: 3,
+    intervalMinutes: 30,
+    notifyOnEveryNew: true
+  });
+
+  const [isOnline, setIsOnline] = useState(true);
+  const [authenticatedEmail, setAuthenticatedEmail] = useState<string | null>(null);
+  const [subscriptionCount, setSubscriptionCount] = useState(0);
+
+  useEffect(() => {
+    // Check online status
+    setIsOnline(navigator.onLine);
+    
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const handleAuthenticated = async (email: string) => {
+    setAuthenticatedEmail(email);
+    // Load subscription count
+    try {
+      const response = await fetch('/api/user-subscriptions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setSubscriptionCount(data.subscriptions?.length || 0);
+      }
+    } catch (error) {
+      console.error('Failed to load subscription count:', error);
+    }
+  };
+
+  const handleDisconnect = () => {
+    setAuthenticatedEmail(null);
+    setSubscriptionCount(0);
+  };
+
+  const handleNotifySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setNotifyLoading(true);
+    setNotifyStatus(null);
+    
+    try {
+      // Basic validations
+      if (!notifyEmail.trim()) {
+        throw new Error('יש להזין כתובת מייל');
+      }
+      if (notifyType === 'single' && !notifyDate) {
+        throw new Error('יש לבחור תאריך');
+      }
+      if (notifyType === 'range' && !notifyDateRange.from) {
+        throw new Error('יש לבחור לפחות תאריך התחלה');
+      }
+
+      // Format request based on notification type
+      let requestPayload: any = {
+        email: notifyEmail,
+        smartSelection: true,
+        notificationSettings: notifySettings
+      };
+
+      if (notifyType === 'single') {
+        requestPayload.date = format(notifyDate!, 'yyyy-MM-dd');
+      } else {
+        requestPayload.start = format(notifyDateRange.from!, 'yyyy-MM-dd');
+        requestPayload.end = notifyDateRange.to 
+          ? format(notifyDateRange.to, 'yyyy-MM-dd') 
+          : format(notifyDateRange.from!, 'yyyy-MM-dd');
+      }
+
+      // Send API request
+      const response = await fetch('/api/notify-request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestPayload)
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setSubscribedEmail(notifyEmail);
+        setNotifyStatus(`✓ ${data.message || 'נרשמת בהצלחה! תקבל מייל כאשר יתפנה תור'}`);
+        setNotifyEmail('');
+        setNotifyDate(undefined);
+        setNotifyDateRange({from: undefined, to: undefined});
+        // Reset notification settings to default
+        setNotifySettings({
+          maxNotifications: 3,
+          intervalMinutes: 30,
+          notifyOnEveryNew: true
+        });
+      } else {
+        setNotifyStatus(`❌ ${data.error || 'שגיאה ברישום להתראות'}`);
+      }
+    } catch (error: any) {
+      setNotifyStatus(`❌ ${error.message || 'שגיאה ברישום להתראות'}`);
+    } finally {
+      setNotifyLoading(false);
+    }
+  };
+
+  const refreshOpportunities = async () => {
+    // Trigger a refresh of cached results
+    try {
+      await fetch('/api/check-appointments', { method: 'POST' });
+      // The OpportunityBanner will reload automatically
+      window.location.reload();
+    } catch (error) {
+      console.error('Failed to refresh opportunities:', error);
+    }
+  };
+
+  return (
+    <div className="bg-background min-h-screen pb-24">
+      <Head>
+        <title>התראות | תורים לרם-אל</title>
+        <meta name="description" content="הגדרת התראות לתורים פנויים" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+        <meta name="theme-color" content="#FFFFFF" id="theme-color-meta" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <link rel="icon" href="/favicon.ico" />
+      </Head>
+
+      <div className="page-container mx-auto px-4 py-5 max-w-screen-sm" dir="rtl">
+        {/* Header */}
+        <header className="mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <img 
+                  src="/icons/icon-72x72.png" 
+                  alt="תור רם-אל"
+                  className="w-11 h-11 rounded-xl shadow-sm"
+                />
+                <div className="absolute inset-0 rounded-xl bg-gradient-to-tr from-white/20 to-transparent dark:from-black/20"></div>
+              </div>
+              
+              <div>
+                <h1 className="text-lg font-bold mb-0.5 leading-none">
+                  התראות
+                </h1>
+                <p className="text-xs text-muted-foreground">קבלת התראות לתורים פנויים</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              {authenticatedEmail && (
+                <AuthenticatedUserNav 
+                  email={authenticatedEmail}
+                  subscriptionCount={subscriptionCount}
+                  onDisconnect={handleDisconnect}
+                />
+              )}
+              <ThemeToggle className="w-7 h-7" />
+              {!isOnline && (
+                <div className="text-muted-foreground" title="אופליין">
+                  <Wifi className="w-5 h-5" />
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent mb-4"></div>
+        </header>
+
+        {/* Main Content */}
+        <div className="space-y-6">
+          {!authenticatedEmail ? (
+            <OTPAuthenticator onAuthenticated={handleAuthenticated} />
+          ) : (
+            <NotificationSubscribe 
+              defaultEmail={authenticatedEmail}
+              onSubscriptionChange={() => handleAuthenticated(authenticatedEmail)}
+            />
+          )}
+        </div>
+      </div>
+
+      <BottomNavigation />
+    </div>
+  );
+} 

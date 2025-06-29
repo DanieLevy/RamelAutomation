@@ -52,7 +52,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
   
-  const { email, date, start, end, smartSelection } = req.body;
+  const { email, date, start, end, smartSelection, notificationSettings } = req.body;
   
   // Validate required fields
   if (!email || (!date && (!start || !end))) {
@@ -149,7 +149,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     end_date = criteria.end;
   }
 
-  // Insert into Supabase (using only existing schema fields)
+  // Default notification settings if not provided
+  const defaultSettings = {
+    maxNotifications: 3,
+    intervalMinutes: 30,
+    notifyOnEveryNew: true
+  };
+  
+  const finalSettings = notificationSettings || defaultSettings;
+
+  // Insert into Supabase (including notification settings)
   const { error: insertError } = await supabase.from('notifications').insert([
     {
       email,
@@ -159,6 +168,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       notification_count: 0,
       last_notified: null,
       status: 'active',
+      max_notifications: finalSettings.maxNotifications,
+      interval_minutes: finalSettings.intervalMinutes,
+      notify_on_every_new: finalSettings.notifyOnEveryNew,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     },
