@@ -1,9 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import { createClient } from '@supabase/supabase-js';
 import { Agent as HttpAgent } from 'http';
 import { Agent as HttpsAgent } from 'https';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 // Create persistent HTTP agents for connection reuse
 const httpAgent = new HttpAgent({ keepAlive: true, maxSockets: 10 });
@@ -60,11 +60,8 @@ interface ApiResponse {
 const responseCache = new Map<string, {data: AppointmentResult, timestamp: number}>();
 const CACHE_TTL = 60 * 1000; // 1 minute TTL for HTTP responses
 
-// Supabase client setup
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY!
-);
+// Use admin client for server-side operations
+const supabase = supabaseAdmin;
 
 const ISRAEL_TIMEZONE = 'Asia/Jerusalem';
 
@@ -104,7 +101,7 @@ const getOpenDays = (startDate: Date, totalDays: number): Date[] => {
   const openDays: Date[] = [];
   let currentDate = new Date(startDate);
   let daysChecked = 0;
-  while (openDays.length < totalDays && daysChecked < 60) {
+  while (openDays.length < totalDays && daysChecked < 500) { // Increased limit to handle up to a year
     if (!isClosedDay(currentDate)) {
       openDays.push(new Date(currentDate));
     }
@@ -271,17 +268,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
   
   try {
     console.log('Manual check: Starting appointment search');
-    const { startDate, days = 7, mode = 'range' } = req.body;
+    const { startDate, days = 365, mode = 'range' } = req.body;
     console.log(`Manual check: Mode=${mode}, Days=${days}, StartDate=${startDate}`);
     
     const baseDate = startDate ? new Date(startDate + 'T00:00:00') : getCurrentDateIsrael();
     let datesToCheck: string[];
     
     if (mode === 'closest') {
-      datesToCheck = getOpenDays(baseDate, 30).map(d => formatDateForUrl(d));
-      console.log(`Manual check: Closest mode - will check up to 30 open days`);
+      datesToCheck = getOpenDays(baseDate, 365).map(d => formatDateForUrl(d));
+      console.log(`Manual check: Closest mode - will check up to 365 open days for first available`);
     } else {
-      const maxDays = Math.min(days, 30);
+      const maxDays = Math.min(days, 365);
       datesToCheck = getOpenDays(baseDate, maxDays).map(d => formatDateForUrl(d));
       console.log(`Manual check: Range mode - will check ${datesToCheck.length} days`);
     }
@@ -293,51 +290,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     
     if (mode === 'closest') {
       // Early exit optimization for closest mode
-      // First check if we have any cached results that are available
-      for (const dateStr of datesToCheck.slice(0, 5)) {
-        const cacheKey = `appointment_${dateStr}`;
-        const cachedResponse = responseCache.get(cacheKey);
+      // Check all dates in parallel with early exit
+      for (let i = 0; i < datesToCheck.length; i += 5) {
+        const batch = datesToCheck.slice(i, i + 5);
+        const batchResults = await Promise.all(batch.map(dateStr => checkSingleDateOptimized(dateStr)));
         
-        if (cachedResponse && 
-            (Date.now() - cachedResponse.timestamp < CACHE_TTL) && 
-            cachedResponse.data.available === true) {
-          console.log(`Found available appointment in cache for ${dateStr}`);
-          results = [cachedResponse.data];
-          break;
+        // Add all results first
+        results.push(...batchResults);
+        
+        // Check if any appointment is available in this batch
+        const found = batchResults.find(r => r.available === true && r.times.length > 0);
+        if (found) {
+          console.log(`Manual check: Found first available appointment on ${found.date} with ${found.times.length} slots`);
+          break; // Early exit once we find the first available appointment
+        }
+        
+        // Small delay between batches
+        if (i + 5 < datesToCheck.length) {
+          await new Promise(resolve => setTimeout(resolve, 30));
         }
       }
       
-      // If no available appointments found in cache, check all dates
+      // If no appointments found, results will be empty
       if (results.length === 0) {
-        // Check all dates in parallel with early exit
-        for (let i = 0; i < datesToCheck.length; i += 5) {
-          const batch = datesToCheck.slice(i, i + 5);
-          const batchResults = await Promise.all(batch.map(dateStr => checkSingleDateOptimized(dateStr)));
-          
-          // Check if any appointment is available in this batch
-          const found = batchResults.find(r => r.available === true && r.times.length > 0);
-          if (found) {
-            console.log(`Manual check: Found appointment on ${found.date} with ${found.times.length} slots`);
-            results = [found];
-            break; // Early exit once we find an available appointment
-          }
-          
-          // Small delay between batches
-          if (i + 5 < datesToCheck.length) {
-            await new Promise(resolve => setTimeout(resolve, 30));
-          }
-        }
-        
-        // If no appointments found, include a default result
-        if (results.length === 0) {
-          console.log(`Manual check: No appointments found in closest mode`);
-          results = [{
-            date: formatDateForUrl(baseDate),
-            available: false,
-            message: 'לא נמצאו תורים פנויים',
-            times: []
-          }];
-        }
+        console.log(`Manual check: No appointments found in closest mode`);
+        results = [{
+          date: formatDateForUrl(baseDate),
+          available: false,
+          message: 'לא נמצאו תורים פנויים',
+          times: []
+        }];
       }
     } else {
       // Range mode: return all results with optimized batch processing
@@ -355,6 +337,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     const earliestAvailable = availableResults.length > 0 ? availableResults[0] : null;
     const totalSlots = availableResults.reduce((sum, r) => sum + r.times.length, 0);
     console.log(`Manual check: Total available slots: ${totalSlots}`);
+    console.log(`Manual check: Available results:`, JSON.stringify(availableResults, null, 2));
     
     // Match auto-check response structure
     const response: ApiResponse = {
@@ -384,11 +367,49 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
       }
     };
     
-    // Save to Supabase cache
-    console.log('Manual check: Writing results to separate cache key');
-    await supabase
+    // Save to Supabase cache - use the same format as auto-check.js
+    console.log('Manual check: Writing results to auto-check cache');
+    
+    // Convert to the EXACT format used by auto-check.js
+    const essentialData = {
+      timestamp: Date.now(),
+      found: availableResults.length > 0,
+      count: availableResults.length,
+      summary: {
+        totalChecked: results.length,
+        elapsed: Math.round(totalTime / 1000),
+        mode: mode,
+        hasAvailable: availableResults.length > 0,
+        completedAt: new Date().toISOString(),
+        performance: {
+          totalTimeMs: totalTime
+        }
+      },
+      // Store only first 5 appointments - use the exact same format as auto-check
+      preview: availableResults.slice(0, 5)
+    };
+    
+    console.log('Manual check: Essential data:', JSON.stringify(essentialData, null, 2));
+    
+    const { data: cacheData, error: cacheError } = await supabase
       .from('cache')
-      .upsert([{ key: 'manual-check', value: { timestamp: Date.now(), result: response } }]);
+      .upsert([{ 
+        key: 'auto-check-minimal', 
+        value: essentialData,
+        updated_at: new Date().toISOString()
+      }], {
+        onConflict: 'key'
+      });
+      
+          if (cacheError) {
+        console.error('Manual check: Failed to update cache:', cacheError);
+      } else {
+        console.log('Manual check: Cache updated successfully');
+        console.log('Manual check: Cache data written:', cacheData);
+      }
+    
+    // Wait a bit to ensure cache is written
+    await new Promise(resolve => setTimeout(resolve, 100));
     
     // Return JSON response
     res.status(200).json(response);

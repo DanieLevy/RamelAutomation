@@ -7,6 +7,8 @@
     "build": "npm run generate:icons && next build",
     "start": "next start",
     "lint": "next lint",
+    "clear": "powershell \"Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force; Start-Sleep 2; if(Test-Path .next){Remove-Item .next -Recurse -Force}; npm cache clean --force; echo 'Project cleared! Run npm run dev to start fresh.'\"",
+    "dev:simple": "next dev",
     "generate:icons": "node scripts/generate-icons.js",
     "pwa:build": "npm run generate:icons && npm run build",
     "dev:netlify": "netlify dev",

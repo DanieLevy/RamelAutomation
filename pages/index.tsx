@@ -4,15 +4,16 @@ import { useRouter } from 'next/router';
 import OpportunityBanner from '@/components/OpportunityBanner';
 import BottomNavigation from '@/components/BottomNavigation';
 import SubscriptionManager from '@/components/SubscriptionManager';
-import ConnectionPrompt from '@/components/ConnectionPrompt';
+import UserOTPAuth from '@/components/UserOTPAuth';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { Button } from '@/components/ui/button';
-import { Bell, Search, Smartphone, Wifi, Mail, Plus } from 'lucide-react';
+import { Bell, Search, Smartphone, Wifi, Mail, Plus, LogOut } from 'lucide-react';
 
 export default function Home() {
   const router = useRouter();
   const [isOnline, setIsOnline] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [authToken, setAuthToken] = useState<string | null>(null);
 
   useEffect(() => {
     // Check online status
@@ -24,10 +25,13 @@ export default function Home() {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Load saved email from localStorage
+    // Load saved authentication from localStorage
     const savedEmail = localStorage.getItem('ramel_user_email');
-    if (savedEmail) {
-      setUserEmail(savedEmail);
+    const savedToken = localStorage.getItem('ramel_auth_token');
+    
+    if (savedEmail && savedToken) {
+      // Verify token is still valid
+      verifyAuthToken(savedEmail, savedToken);
     }
 
     return () => {
@@ -38,21 +42,58 @@ export default function Home() {
 
   const refreshOpportunities = async () => {
     try {
-      await fetch('/api/check-appointments', { method: 'POST' });
-      window.location.reload();
+      await fetch('/api/check-appointments', { 
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          mode: 'closest',  // Find the first available appointment
+          days: 365         // Check up to a year ahead
+        })
+      });
+      // Small delay to ensure cache is written
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
     } catch (error) {
       console.error('Failed to refresh opportunities:', error);
     }
   };
 
-  const handleConnectEmail = (email: string) => {
+  const handleAuthenticated = (email: string, token: string) => {
     localStorage.setItem('ramel_user_email', email);
+    localStorage.setItem('ramel_auth_token', token);
     setUserEmail(email);
+    setAuthToken(token);
   };
 
   const handleDisconnect = () => {
     localStorage.removeItem('ramel_user_email');
+    localStorage.removeItem('ramel_auth_token');
     setUserEmail(null);
+    setAuthToken(null);
+  };
+
+  const verifyAuthToken = async (email: string, token: string) => {
+    try {
+      const response = await fetch('/api/verify-auth-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token })
+      });
+      
+      if (response.ok) {
+        setUserEmail(email);
+        setAuthToken(token);
+      } else {
+        // Token invalid, clear localStorage
+        localStorage.removeItem('ramel_user_email');
+        localStorage.removeItem('ramel_auth_token');
+      }
+    } catch (error) {
+      console.error('Failed to verify token:', error);
+    }
   };
 
   return (
@@ -90,6 +131,17 @@ export default function Home() {
             </div>
             
             <div className="flex items-center gap-2">
+              {userEmail && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleDisconnect}
+                  className="h-7 px-2"
+                  title="התנתק"
+                >
+                  <LogOut className="w-4 h-4" />
+                </Button>
+              )}
               <ThemeToggle className="w-7 h-7" />
               {!isOnline && (
                 <div className="text-muted-foreground" title="אופליין">
@@ -108,31 +160,30 @@ export default function Home() {
         {/* Main Content */}
         <div className="space-y-6">
           {!userEmail ? (
-            // User not connected - show connection prompt
+            // User not connected - show OTP authentication
             <div className="space-y-6">
-              <ConnectionPrompt onConnect={handleConnectEmail} />
+              <UserOTPAuth onAuthenticated={handleAuthenticated} />
 
-              {/* Quick Actions for non-connected users */}
-              <div className="grid grid-cols-1 gap-4 max-w-xs mx-auto">
-                <Button
-                  onClick={() => router.push('/notifications')}
-                  variant="outline"
-                  className="h-12 border-primary/30 text-primary hover:text-primary hover:bg-primary/10"
-                  size="lg"
-                >
-                  <Bell className="w-5 h-5 ml-2" />
-                  רישום התראה חדשה
-                </Button>
+              {/* Info for non-connected users */}
+              <div className="text-center space-y-4 mt-8">
+                <div className="bg-muted/30 rounded-lg p-4 max-w-sm mx-auto">
+                  <p className="text-sm text-muted-foreground">
+                    כדי לרשום התראות עליך להתחבר עם המייל שלך
+                  </p>
+                </div>
                 
-                <Button
-                  onClick={() => router.push('/manual-search')}
-                  variant="outline"
-                  className="h-12 border-primary/30 text-primary hover:text-primary hover:bg-primary/10"
-                  size="lg"
-                >
-                  <Search className="w-5 h-5 ml-2" />
-                  חיפוש ידני
-                </Button>
+                {/* Quick Actions for non-connected users */}
+                <div className="grid grid-cols-1 gap-4 max-w-xs mx-auto">
+                  <Button
+                    onClick={() => router.push('/manual-search')}
+                    variant="outline"
+                    className="h-12 border-primary/30 text-primary hover:text-primary hover:bg-primary/10"
+                    size="lg"
+                  >
+                    <Search className="w-5 h-5 ml-2" />
+                    חיפוש ידני
+                  </Button>
+                </div>
               </div>
             </div>
           ) : (

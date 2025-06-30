@@ -6,8 +6,9 @@ import NotificationSubscribe from '@/components/NotificationSubscribe';
 import OpportunityBanner from '@/components/OpportunityBanner';
 import BottomNavigation from '@/components/BottomNavigation';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
-import { ArrowLeft, Bell, Wifi } from 'lucide-react';
-import OTPAuthenticator from '@/components/OTPAuthenticator';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft, Bell, Wifi, LogOut } from 'lucide-react';
+import UserOTPAuth from '@/components/UserOTPAuth';
 import AuthenticatedUserNav from '@/components/AuthenticatedUserNav';
 
 export default function NotificationsPage() {
@@ -31,6 +32,7 @@ export default function NotificationsPage() {
 
   const [isOnline, setIsOnline] = useState(true);
   const [authenticatedEmail, setAuthenticatedEmail] = useState<string | null>(null);
+  const [authToken, setAuthToken] = useState<string | null>(null);
   const [subscriptionCount, setSubscriptionCount] = useState(0);
 
   useEffect(() => {
@@ -43,15 +45,44 @@ export default function NotificationsPage() {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
+    // Load saved authentication from localStorage
+    const savedEmail = localStorage.getItem('ramel_user_email');
+    const savedToken = localStorage.getItem('ramel_auth_token');
+    
+    if (savedEmail && savedToken) {
+      // Verify token is still valid
+      verifyAuthToken(savedEmail, savedToken);
+    }
+
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
 
-  const handleAuthenticated = async (email: string) => {
-    setAuthenticatedEmail(email);
-    // Load subscription count
+  const verifyAuthToken = async (email: string, token: string) => {
+    try {
+      const response = await fetch('/api/verify-auth-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token })
+      });
+      
+      if (response.ok) {
+        setAuthenticatedEmail(email);
+        setAuthToken(token);
+        loadSubscriptionCount(email);
+      } else {
+        // Token invalid, clear localStorage
+        localStorage.removeItem('ramel_user_email');
+        localStorage.removeItem('ramel_auth_token');
+      }
+    } catch (error) {
+      console.error('Failed to verify token:', error);
+    }
+  };
+
+  const loadSubscriptionCount = async (email: string) => {
     try {
       const response = await fetch('/api/user-subscriptions', {
         method: 'POST',
@@ -68,8 +99,19 @@ export default function NotificationsPage() {
     }
   };
 
+  const handleAuthenticated = async (email: string, token: string) => {
+    localStorage.setItem('ramel_user_email', email);
+    localStorage.setItem('ramel_auth_token', token);
+    setAuthenticatedEmail(email);
+    setAuthToken(token);
+    loadSubscriptionCount(email);
+  };
+
   const handleDisconnect = () => {
+    localStorage.removeItem('ramel_user_email');
+    localStorage.removeItem('ramel_auth_token');
     setAuthenticatedEmail(null);
+    setAuthToken(null);
     setSubscriptionCount(0);
   };
 
@@ -142,9 +184,20 @@ export default function NotificationsPage() {
   const refreshOpportunities = async () => {
     // Trigger a refresh of cached results
     try {
-      await fetch('/api/check-appointments', { method: 'POST' });
-      // The OpportunityBanner will reload automatically
-      window.location.reload();
+      await fetch('/api/check-appointments', { 
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          mode: 'closest',  // Find the first available appointment
+          days: 365         // Check up to a year ahead
+        })
+      });
+      // Small delay to ensure cache is written
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
     } catch (error) {
       console.error('Failed to refresh opportunities:', error);
     }
@@ -186,11 +239,15 @@ export default function NotificationsPage() {
             
             <div className="flex items-center gap-2">
               {authenticatedEmail && (
-                <AuthenticatedUserNav 
-                  email={authenticatedEmail}
-                  subscriptionCount={subscriptionCount}
-                  onDisconnect={handleDisconnect}
-                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleDisconnect}
+                  className="h-7 px-2"
+                  title="התנתק"
+                >
+                  <LogOut className="w-4 h-4" />
+                </Button>
               )}
               <ThemeToggle className="w-7 h-7" />
               {!isOnline && (
@@ -207,11 +264,22 @@ export default function NotificationsPage() {
         {/* Main Content */}
         <div className="space-y-6">
           {!authenticatedEmail ? (
-            <OTPAuthenticator onAuthenticated={handleAuthenticated} />
+            <div className="space-y-6">
+              <UserOTPAuth onAuthenticated={handleAuthenticated} />
+              
+              {/* Info for non-connected users */}
+              <div className="text-center mt-8">
+                <div className="bg-muted/30 rounded-lg p-4 max-w-sm mx-auto">
+                  <p className="text-sm text-muted-foreground">
+                    התחבר עם המייל שלך כדי לרשום התראות לתורים פנויים
+                  </p>
+                </div>
+              </div>
+            </div>
           ) : (
             <NotificationSubscribe 
               defaultEmail={authenticatedEmail}
-              onSubscriptionChange={() => handleAuthenticated(authenticatedEmail)}
+              onSubscriptionChange={() => loadSubscriptionCount(authenticatedEmail)}
             />
           )}
         </div>

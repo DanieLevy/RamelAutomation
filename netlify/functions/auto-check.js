@@ -144,8 +144,8 @@ const getOpenDays = (startDate, totalDays) => {
   let currentDate = new Date(startDate)
   let daysChecked = 0
   
-  // Enhanced safety limit with better logic
-  const maxDaysToCheck = Math.min(totalDays * 2, 60) // More flexible
+  // Enhanced safety limit to handle up to a year
+  const maxDaysToCheck = Math.min(totalDays * 2, 500) // Allow checking up to 500 days
   
   while (openDays.length < totalDays && daysChecked < maxDaysToCheck) {
     if (!isClosedDay(currentDate)) {
@@ -328,10 +328,10 @@ async function findAppointmentsEnhanced() {
   Object.keys(performanceMetrics).forEach(key => performanceMetrics[key] = 0)
   
   const currentDate = getCurrentDateIsrael()
-  const maxDays = 30 // Restored to 30 for better coverage
+  const maxDays = 365 // Check up to a year ahead to find any available appointment
   const openDates = getOpenDays(currentDate, maxDays)
   
-  console.log(`📊 Will check ${openDates.length} dates with enhanced reliability`)
+  console.log(`📊 Will check ${openDates.length} open dates (up to 1 year ahead) to find first available appointment`)
   
   // INTELLIGENT CACHE CHECK: Look for recent cached results first
   const recentResults = []
@@ -419,9 +419,9 @@ async function findAppointmentsEnhanced() {
       break
     }
     
-    // If we found appointments and have checked enough, consider early exit
-    if (foundAny && elapsed > 2000 && results.length >= 15) {
-      console.log(`🎯 EARLY EXIT: Found appointments after checking ${results.length} dates in ${elapsed}ms`)
+    // If we found any appointment, stop immediately (since we're looking for first available)
+    if (foundAny) {
+      console.log(`🎯 EARLY EXIT: Found first available appointment after checking ${results.length} dates in ${elapsed}ms`)
       break
     }
     

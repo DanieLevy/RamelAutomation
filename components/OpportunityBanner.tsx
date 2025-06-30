@@ -28,6 +28,7 @@ export default function OpportunityBanner({ onRefresh }: OpportunityBannerProps)
       const response = await fetch('/api/cached-results');
       if (response.ok) {
         const data = await response.json();
+        console.log('OpportunityBanner: Loaded cached data:', data);
         setCachedResult(data);
       }
     } catch (error) {
@@ -78,6 +79,11 @@ export default function OpportunityBanner({ onRefresh }: OpportunityBannerProps)
   }
 
   if (!cachedResult?.found || !cachedResult.preview?.length) {
+    console.log('OpportunityBanner: No appointments to show', {
+      found: cachedResult?.found,
+      previewLength: cachedResult?.preview?.length,
+      preview: cachedResult?.preview
+    });
     return (
       <div className="bg-muted/30 border border-border/30 rounded-xl p-4 mb-4">
         <div className="flex items-center justify-between">
@@ -111,6 +117,7 @@ export default function OpportunityBanner({ onRefresh }: OpportunityBannerProps)
   }
 
   const nextAppointment = cachedResult.preview[0];
+  console.log('OpportunityBanner: Showing appointment', nextAppointment);
 
   return (
     <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 border border-green-200 dark:border-green-800/30 rounded-xl p-4 mb-4">
