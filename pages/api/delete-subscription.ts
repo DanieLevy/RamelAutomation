@@ -15,14 +15,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Instead of deleting, mark as cancelled to preserve history
+    // Use soft delete to preserve history
     const { data, error } = await supabase
       .from('notifications')
       .update({ 
         status: 'cancelled',
+        deleted_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
       .eq('id', id)
+      .is('deleted_at', null) // Only update if not already deleted
       .select()
       .single();
 

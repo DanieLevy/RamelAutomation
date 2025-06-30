@@ -153,10 +153,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const defaultSettings = {
     maxNotifications: 3,
     intervalMinutes: 30,
-    notifyOnEveryNew: true
+    notifyOnEveryNew: true,
+    // Smart scheduling defaults
+    preferredSendTime: '09:00',
+    batchNotifications: true,
+    batchIntervalHours: 4,
+    enableUrgentMode: true,
+    sendOnWeekends: false
   };
   
-  const finalSettings = notificationSettings || defaultSettings;
+  const finalSettings = { ...defaultSettings, ...notificationSettings };
 
   // Insert into Supabase (including notification settings)
   const { error: insertError } = await supabase.from('notifications').insert([
@@ -171,6 +177,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       max_notifications: finalSettings.maxNotifications,
       interval_minutes: finalSettings.intervalMinutes,
       notify_on_every_new: finalSettings.notifyOnEveryNew,
+      // Smart scheduling settings
+      preferred_send_time: finalSettings.preferredSendTime,
+      batch_notifications: finalSettings.batchNotifications,
+      batch_interval_hours: finalSettings.batchIntervalHours,
+      enable_urgent_mode: finalSettings.enableUrgentMode,
+      send_on_weekends: finalSettings.sendOnWeekends,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     },

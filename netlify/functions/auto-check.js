@@ -515,20 +515,21 @@ exports.handler = async (event, context) => {
     const totalTime = Math.round((Date.now() - functionStart) / 1000)
     console.log(`⚡ FUNCTION COMPLETED in ${totalTime}s (target: <8s)`)
     
-    // TRIGGER EMAIL PROCESSING: Actually process emails if appointments found
+    // TRIGGER EMAIL PROCESSING: Queue emails if appointments found
     let emailProcessingResult = null;
     const shouldTriggerEmails = appointmentResults.found && appointmentResults.appointments.length > 0;
     
     if (shouldTriggerEmails) {
-      console.log(`📧 Found ${appointmentResults.appointments.length} appointments - triggering email processing`);
+      console.log(`📧 Found ${appointmentResults.appointments.length} appointments - triggering email notifications`);
       
       try {
-        // Call the email processing API directly
-        const emailApiUrl = process.env.DEPLOY_URL || 'https://tor-ramel.netlify.app';
+        // Call the email processing API to queue notifications
+        const emailApiUrl = process.env.DEPLOY_URL || process.env.URL || 'https://tor-ramel.netlify.app';
         const response = await fetch(`${emailApiUrl}/api/process-notifications`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.CRON_SECRET || 'default-secret'}`
           },
           body: JSON.stringify({
             appointments: appointmentResults.appointments
@@ -537,10 +538,14 @@ exports.handler = async (event, context) => {
 
         if (response.ok) {
           emailProcessingResult = await response.json();
-          console.log(`📧 ✅ Email processing completed: ${emailProcessingResult.emailsSent} sent, ${emailProcessingResult.emailsSkipped} skipped`);
+          console.log(`📧 ✅ Email processing completed: ${emailProcessingResult.emailsQueued} queued, ${emailProcessingResult.emailsSent} sent immediately, ${emailProcessingResult.emailsSkipped} skipped`);
+          
+          // The email queue will be processed separately by its own scheduled function
+          // This ensures email sending doesn't slow down appointment checking
         } else {
-          console.error(`📧 ❌ Email processing failed with status: ${response.status}`);
-          emailProcessingResult = { error: `HTTP ${response.status}` };
+          const errorText = await response.text();
+          console.error(`📧 ❌ Email processing failed with status ${response.status}: ${errorText}`);
+          emailProcessingResult = { error: `HTTP ${response.status}: ${errorText}` };
         }
       } catch (emailError) {
         console.error(`📧 ❌ Email processing error:`, emailError.message);

@@ -116,11 +116,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Fetch active notifications that need processing
+    // Fetch active notifications that need processing (excluding soft-deleted)
     const { data: notifications, error: fetchError } = await supabase
       .from('notifications')
       .select('*')
-      .eq('status', 'active');
+      .eq('status', 'active')
+      .is('deleted_at', null); // Exclude soft-deleted records
 
     if (fetchError) {
       throw new Error(`Failed to fetch notifications: ${fetchError.message}`);
@@ -170,6 +171,135 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             continue;
           }
 
+          // Check if should batch notifications
+          const shouldBatch = notification.batch_notifications !== false;
+          const batchInterval = (notification.batch_interval_hours || 4) * 60 * 60 * 1000; // Convert to milliseconds
+          
+          // Check if urgent mode applies (same-day appointments)
+          const todayStr = formatDateIsrael(getCurrentDateIsrael());
+          const hasUrgentAppointments = notification.enable_urgent_mode && 
+            matchingResults.some(apt => apt.date === todayStr);
+
+          // Calculate if it's appropriate time to send based on user preferences
+          const now = new Date();
+          const userTimezone = notification.timezone || 'Asia/Jerusalem';
+          const preferredTime = notification.preferred_send_time || '09:00';
+          const quietStart = notification.quiet_hours_start || '22:00';
+          const quietEnd = notification.quiet_hours_end || '07:00';
+          
+          // Check if we're in quiet hours
+          const currentHour = parseInt(new Intl.DateTimeFormat('en-US', {
+            timeZone: userTimezone,
+            hour: '2-digit',
+            hour12: false
+          }).format(now));
+          
+          const quietStartHour = parseInt(quietStart.split(':')[0]);
+          const quietEndHour = parseInt(quietEnd.split(':')[0]);
+          
+          const inQuietHours = (quietStartHour > quietEndHour) 
+            ? (currentHour >= quietStartHour || currentHour < quietEndHour)
+            : (currentHour >= quietStartHour && currentHour < quietEndHour);
+
+          // Check if it's weekend and user doesn't want weekend notifications
+          const dayOfWeek = new Date().getDay();
+          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+          
+          if (!notification.send_on_weekends && isWeekend && !hasUrgentAppointments) {
+            console.log(`📧 Skipping ${notification.email} - weekend notifications disabled`);
+            continue;
+          }
+
+          // If urgent appointments exist, send immediately regardless of batching/quiet hours
+          if (hasUrgentAppointments) {
+            console.log(`🚨 Urgent same-day appointments for ${notification.email} - sending immediately`);
+          } else if (shouldBatch && !isTestMode) {
+            // Check if we should batch this notification
+            const lastBatchSent = notification.last_batch_sent_at ? new Date(notification.last_batch_sent_at) : null;
+            
+            if (lastBatchSent && (now.getTime() - lastBatchSent.getTime() < batchInterval)) {
+              // Add to batch queue instead of sending immediately
+              console.log(`📦 Adding to batch queue for ${notification.email} (next batch in ${Math.round((batchInterval - (now.getTime() - lastBatchSent.getTime())) / 60000)} minutes)`);
+              
+              await supabase
+                .from('notification_batch_queue')
+                .upsert({
+                  notification_id: notification.id,
+                  appointment_data: matchingResults,
+                  is_urgent: false,
+                  scheduled_send_time: new Date(lastBatchSent.getTime() + batchInterval).toISOString(),
+                  status: 'pending'
+                }, {
+                  ignoreDuplicates: false
+                });
+              
+              continue;
+            }
+            
+            // Get all pending batched appointments
+            const { data: batchedAppointments } = await supabase
+              .from('notification_batch_queue')
+              .select('appointment_data')
+              .eq('notification_id', notification.id)
+              .eq('status', 'pending');
+
+            if (batchedAppointments && batchedAppointments.length > 0) {
+              // Combine with current results
+              batchedAppointments.forEach(batch => {
+                if (batch.appointment_data) {
+                  matchingResults = [...matchingResults, ...batch.appointment_data];
+                }
+              });
+              
+              // Mark batched items as processed
+              await supabase
+                .from('notification_batch_queue')
+                .update({ status: 'processing', processed_at: new Date().toISOString() })
+                .eq('notification_id', notification.id)
+                .eq('status', 'pending');
+            }
+            
+            // Update last batch sent time
+            await supabase
+              .from('notifications')
+              .update({ last_batch_sent_at: new Date().toISOString() })
+              .eq('id', notification.id);
+          }
+
+          // Skip if in quiet hours (unless urgent)
+          if (inQuietHours && !hasUrgentAppointments && !isTestMode) {
+            console.log(`🌙 In quiet hours for ${notification.email} - scheduling for ${quietEnd}`);
+            
+            // Calculate next send time after quiet hours
+            const nextSendTime = new Date();
+            nextSendTime.setHours(parseInt(quietEnd.split(':')[0]), parseInt(quietEnd.split(':')[1]), 0, 0);
+            if (nextSendTime <= now) {
+              nextSendTime.setDate(nextSendTime.getDate() + 1);
+            }
+            
+            await supabase
+              .from('notification_batch_queue')
+              .upsert({
+                notification_id: notification.id,
+                appointment_data: matchingResults,
+                is_urgent: false,
+                scheduled_send_time: nextSendTime.toISOString(),
+                status: 'pending'
+              }, {
+                ignoreDuplicates: false
+              });
+            
+            continue;
+          }
+
+          // Remove duplicates from batched results
+          const uniqueResults = Array.from(
+            new Map(matchingResults.map(item => [`${item.date}-${item.times.join(',')}`, item])).values()
+          );
+
+          // Use unique results for processing
+          matchingResults = uniqueResults;
+
           // Fetch fresh notification data to avoid stale counts in test mode
           let currentNotification = notification;
           if (isTestMode) {
@@ -186,7 +316,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const maxNotifications = currentNotification.max_notifications || 3; // Default to 3 if not set
           const intervalMinutes = currentNotification.interval_minutes || 30; // Default to 30 minutes if not set
           const notifyOnEveryNew = currentNotification.notify_on_every_new !== false; // Default to true
-          const now = new Date();
           const lastNotified = currentNotification.last_notified ? new Date(currentNotification.last_notified) : null;
           const timeSinceLastNotification = lastNotified ? now.getTime() - lastNotified.getTime() : Infinity;
 

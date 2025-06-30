@@ -19,6 +19,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .from('notifications')
       .select('*')
       .eq('email', email)
+      .is('deleted_at', null) // Exclude soft-deleted records
       .order('created_at', { ascending: false });
 
     if (error) {

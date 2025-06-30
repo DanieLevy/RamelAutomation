@@ -4,6 +4,9 @@
 
 [build.environment]
   NODE_VERSION = "18"
+  CRON_SECRET = "d47a7f5b61be83cb1d5de7f3c38fbf3ef6b5d2d1407f9874b159a0c36f76025d"
+  ADMIN_SECRET = "f1039cc377c4a66a8167e943defe23a7e687d13b8cf11a2be91761dc39500234"
+
 
 # Use Next.js plugin for automatic handling
 [[plugins]]
@@ -18,8 +21,25 @@
   schedule = "*/5 * * * *" # every 5 minutes
   timeout = 900  # 15 minutes maximum (unlimited until we get it working)
 
+# Email queue processing function configuration
+[functions."process-email-queue"]
+  schedule = "0 */2 * * *" # every 2 hours
+  timeout = 300  # 5 minutes maximum
+
+# Data cleanup function configuration
+[functions."data-cleanup"]
+  schedule = "0 3 * * *" # daily at 3 AM
+  timeout = 300  # 5 minutes maximum
+
+# Batch notifications processing function configuration
+[functions."process-batch-notifications"]
+  schedule = "*/30 * * * *" # every 30 minutes
+  timeout = 300  # 5 minutes maximum
+
 # Environment variables needed for deployment
 # Set these in Netlify dashboard:
 # USER_ID = "4481"
 # CODE_AUTH = "Sa1W2GjL"
-# REQUEST_DELAY_MS = "1000" 
+# REQUEST_DELAY_MS = "1000"
+# CRON_SECRET = "your-secret-key"
+# ADMIN_SECRET = "your-admin-secret" 

@@ -9,6 +9,12 @@ interface NotificationSettings {
   maxNotifications: number;
   intervalMinutes: number;
   notifyOnEveryNew: boolean;
+  // Smart scheduling settings
+  preferredSendTime?: string;
+  batchNotifications?: boolean;
+  batchIntervalHours?: number;
+  enableUrgentMode?: boolean;
+  sendOnWeekends?: boolean;
 }
 
 interface NotificationSubscribeProps {
@@ -34,7 +40,13 @@ export default function NotificationSubscribe({
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
     maxNotifications: 3,
     intervalMinutes: 30,
-    notifyOnEveryNew: true
+    notifyOnEveryNew: true,
+    // Smart scheduling defaults
+    preferredSendTime: '09:00',
+    batchNotifications: true,
+    batchIntervalHours: 4,
+    enableUrgentMode: true,
+    sendOnWeekends: false
   });
 
   useEffect(() => {
@@ -149,7 +161,13 @@ export default function NotificationSubscribe({
           notificationSettings: {
             maxNotifications: notificationSettings.maxNotifications,
             intervalMinutes: notificationSettings.intervalMinutes,
-            notifyOnEveryNew: notificationSettings.notifyOnEveryNew
+            notifyOnEveryNew: notificationSettings.notifyOnEveryNew,
+            // Smart scheduling settings
+            preferredSendTime: notificationSettings.preferredSendTime,
+            batchNotifications: notificationSettings.batchNotifications,
+            batchIntervalHours: notificationSettings.batchIntervalHours,
+            enableUrgentMode: notificationSettings.enableUrgentMode,
+            sendOnWeekends: notificationSettings.sendOnWeekends
           }
         })
       });
@@ -360,6 +378,74 @@ export default function NotificationSubscribe({
                 />
                 התראה על כל תור חדש שמתפנה
               </label>
+              
+              {/* Smart Scheduling Options */}
+              <div className="space-y-4 pt-4 border-t border-border">
+                <h4 className="text-sm font-medium">הגדרות חכמות</h4>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium mb-1">שעת שליחה מועדפת</label>
+                    <input
+                      type="time"
+                      value={notificationSettings.preferredSendTime}
+                      onChange={(e) => handleNotifySettingsChange('preferredSendTime', e.target.value)}
+                      className="w-full px-3 py-1.5 text-sm border rounded-lg bg-background focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs font-medium mb-1">איסוף התראות</label>
+                    <Select 
+                      value={notificationSettings.batchIntervalHours?.toString() || '4'} 
+                      onValueChange={(value) => handleNotifySettingsChange('batchIntervalHours', parseInt(value))}
+                    >
+                      <SelectTrigger className="text-right h-9 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">כל שעה</SelectItem>
+                        <SelectItem value="2">כל שעתיים</SelectItem>
+                        <SelectItem value="4">כל 4 שעות</SelectItem>
+                        <SelectItem value="8">כל 8 שעות</SelectItem>
+                        <SelectItem value="12">כל 12 שעות</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={notificationSettings.batchNotifications !== false}
+                      onChange={(e) => handleNotifySettingsChange('batchNotifications', e.target.checked)}
+                      className="rounded"
+                    />
+                    אסוף מספר תורים להתראה אחת
+                  </label>
+                  
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={notificationSettings.enableUrgentMode !== false}
+                      onChange={(e) => handleNotifySettingsChange('enableUrgentMode', e.target.checked)}
+                      className="rounded"
+                    />
+                    התראה מיידית על תורים להיום
+                  </label>
+                  
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={notificationSettings.sendOnWeekends}
+                      onChange={(e) => handleNotifySettingsChange('sendOnWeekends', e.target.checked)}
+                      className="rounded"
+                    />
+                    שלח התראות בסופי שבוע
+                  </label>
+                </div>
+              </div>
             </div>
           )}
 
