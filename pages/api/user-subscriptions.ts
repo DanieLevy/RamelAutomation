@@ -1,36 +1,43 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
+const supabase = supabaseAdmin;
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+
   try {
-    const { email } = req.body;
-
-    if (!email) {
-      return res.status(400).json({ error: 'Email is required' });
-    }
-
-    // Fetch user subscriptions
-    const { data: subscriptions, error } = await supabaseAdmin
+    const { data: subscriptions, error } = await supabase
       .from('notifications')
       .select('*')
       .eq('email', email)
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching subscriptions:', error);
-      return res.status(500).json({ error: 'Failed to fetch subscriptions' });
+      console.error('Failed to fetch user subscriptions:', error);
+      return res.status(500).json({ 
+        error: 'Failed to fetch subscriptions',
+        details: error.message 
+      });
     }
 
     return res.status(200).json({ 
-      subscriptions: subscriptions || []
+      success: true,
+      subscriptions: subscriptions || [] 
     });
-
   } catch (error) {
-    console.error('Error in user-subscriptions API:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error('User subscriptions API error:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 } 
