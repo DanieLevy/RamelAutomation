@@ -27,7 +27,8 @@ export const generateAppointmentNotificationEmail = (
   responseTokens: {[key: string]: string} | null,
   currentPhase: number,
   maxPhases: number,
-  subscriberEmail: string
+  subscriberEmail: string,
+  unsubscribeToken: string
 ): { html: string; subject: string; text: string } => {
   
   // Count total appointments
@@ -274,7 +275,7 @@ export const generateAppointmentNotificationEmail = (
         
         <div class="footer">
           <div class="footer-text">
-            <a href="${baseUrl}/unsubscribe?token=${encodeURIComponent(subscriberEmail)}" class="footer-link">📵 הפסק התראות</a>
+            <a href="${baseUrl}/unsubscribe?token=${unsubscribeToken}" class="footer-link">📵 הפסק התראות</a>
             •
             <a href="${baseUrl}" class="footer-link">🏠 אתר ראשי</a>
           </div>
@@ -302,7 +303,7 @@ ${responseTokens && Object.keys(responseTokens).length > 0 ? `
 😕 לא מתאים: ${baseUrl}/appointment-response?token=${Object.values(responseTokens)[0]}&action=not_wanted
 ` : ''}
 
-📵 הפסק התראות: ${baseUrl}/unsubscribe?token=${encodeURIComponent(subscriberEmail)}
+📵 הפסק התראות: ${baseUrl}/unsubscribe?token=${unsubscribeToken}
 🏠 אתר ראשי: ${baseUrl}
 
 צוות Tor-RamEl

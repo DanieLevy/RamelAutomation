@@ -328,7 +328,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             responseTokens,
             currentNotifCount + 1, // Current notification number
             maxNotifications, // Max notifications based on user settings
-            currentNotification.email
+            currentNotification.email,
+            currentNotification.unsubscribe_token
           );
 
           const mailOptions = {
