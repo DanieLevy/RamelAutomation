@@ -31,6 +31,26 @@ export default function SubscriptionManager({ userEmail, onDisconnect }: Subscri
   const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
+    const loadSubscriptions = async () => {
+      setLoading(true);
+      try {
+        const response = await fetch('/api/user-subscriptions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: userEmail })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setSubscriptions(data.subscriptions || []);
+        }
+      } catch (error) {
+        console.error('Failed to load subscriptions:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
     loadSubscriptions();
   }, [userEmail]);
 

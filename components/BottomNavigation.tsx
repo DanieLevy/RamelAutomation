@@ -1,6 +1,6 @@
 import { useRouter } from 'next/router';
 import { Home, Bell, Search } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 
 export default function BottomNavigation() {
   const router = useRouter();
@@ -11,7 +11,7 @@ export default function BottomNavigation() {
   });
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  const navItems = [
+  const navItems = useMemo(() => [
     { 
       href: '/manual-search', 
       icon: Search, 
@@ -30,7 +30,7 @@ export default function BottomNavigation() {
       label: 'בית',
       active: currentPath === '/'
     }
-  ];
+  ], [currentPath]);
 
   useEffect(() => {
     let retryCount = 0;
@@ -93,7 +93,7 @@ export default function BottomNavigation() {
       window.removeEventListener('resize', handleResize);
       timers.forEach(timer => clearTimeout(timer));
     };
-  }, [currentPath]); // Re-run when path changes
+  }, [currentPath, navItems]); // Re-run when path changes
 
   return (
     <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50">
@@ -117,7 +117,7 @@ export default function BottomNavigation() {
             return (
               <button
                 key={item.href}
-                ref={el => buttonRefs.current[index] = el}
+                ref={el => { buttonRefs.current[index] = el; }}
                 onClick={() => router.push(item.href)}
                 className={`
                   relative flex flex-col items-center justify-center rounded-full w-[44px] h-[44px] 

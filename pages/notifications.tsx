@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { format } from 'date-fns';
@@ -35,54 +35,7 @@ export default function NotificationsPage() {
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [subscriptionCount, setSubscriptionCount] = useState(0);
 
-  useEffect(() => {
-    // Check online status
-    setIsOnline(navigator.onLine);
-    
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    // Load saved authentication from localStorage
-    const savedEmail = localStorage.getItem('ramel_user_email');
-    const savedToken = localStorage.getItem('ramel_auth_token');
-    
-    if (savedEmail && savedToken) {
-      // Verify token is still valid
-      verifyAuthToken(savedEmail, savedToken);
-    }
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  const verifyAuthToken = async (email: string, token: string) => {
-    try {
-      const response = await fetch('/api/verify-auth-token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token })
-      });
-      
-      if (response.ok) {
-        setAuthenticatedEmail(email);
-        setAuthToken(token);
-        loadSubscriptionCount(email);
-      } else {
-        // Token invalid, clear localStorage
-        localStorage.removeItem('ramel_user_email');
-        localStorage.removeItem('ramel_auth_token');
-      }
-    } catch (error) {
-      console.error('Failed to verify token:', error);
-    }
-  };
-
-  const loadSubscriptionCount = async (email: string) => {
+  const loadSubscriptionCount = useCallback(async (email: string) => {
     try {
       const response = await fetch('/api/user-subscriptions', {
         method: 'POST',
@@ -97,7 +50,55 @@ export default function NotificationsPage() {
     } catch (error) {
       console.error('Failed to load subscription count:', error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    // Check online status
+    setIsOnline(navigator.onLine);
+    
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Define verifyAuthToken inside useEffect
+    const verifyAuthToken = async (email: string, token: string) => {
+      try {
+        const response = await fetch('/api/verify-auth-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token })
+        });
+        
+        if (response.ok) {
+          setAuthenticatedEmail(email);
+          setAuthToken(token);
+          loadSubscriptionCount(email);
+        } else {
+          // Token invalid, clear localStorage
+          localStorage.removeItem('ramel_user_email');
+          localStorage.removeItem('ramel_auth_token');
+        }
+      } catch (error) {
+        console.error('Failed to verify token:', error);
+      }
+    };
+
+    // Load saved authentication from localStorage
+    const savedEmail = localStorage.getItem('ramel_user_email');
+    const savedToken = localStorage.getItem('ramel_auth_token');
+    
+    if (savedEmail && savedToken) {
+      // Verify token is still valid
+      verifyAuthToken(savedEmail, savedToken);
+    }
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [loadSubscriptionCount]);
 
   const handleAuthenticated = async (email: string, token: string) => {
     localStorage.setItem('ramel_user_email', email);
