@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import nodemailer from 'nodemailer';
 import { generateAppointmentNotificationEmail } from '@/lib/emailTemplates';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { emailService } from '@/lib/emailService';
 
 // ============================================================================
 // EMAIL NOTIFICATION PROCESSOR
@@ -55,6 +56,7 @@ const generateBookingUrl = (dateStr: string) => {
 };
 
 // Create reusable email transporter with connection pooling
+// DEPRECATED: Now using emailService with retry logic
 const createEmailTransporter = () => {
   return nodemailer.createTransport({
     service: 'gmail',
@@ -134,9 +136,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log(`📧 Processing ${notifications.length} active subscriptions`);
 
-    // Create email transporter
-    const transporter = createEmailTransporter();
-    let emailsSent = 0;
+    // Initialize counters
+    let emailsQueued = 0;
     let emailsSkipped = 0;
 
     // Process notifications in optimized batches
@@ -144,7 +145,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     for (let i = 0; i < notifications.length; i += BATCH_SIZE) {
       const batch = notifications.slice(i, i + BATCH_SIZE);
-      const emailPromises: Promise<any>[] = [];
 
       for (const notification of batch) {
         try {
@@ -332,97 +332,89 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             currentNotification.unsubscribe_token
           );
 
-          const mailOptions = {
-            from: `"תורים לרם-אל" <${process.env.EMAIL_SENDER}>`,
+          // Queue email instead of sending directly
+          const queueResult = await emailService.queueEmail({
             to: currentNotification.email,
             subject: emailContent.subject,
+            html: emailContent.html,
             text: emailContent.text,
-            html: emailContent.html
-          };
+            notificationId: currentNotification.id,
+            appointmentData: matchingResults,
+            priority: isTestMode ? 10 : 0 // Higher priority for test mode
+          });
 
-          // Add to batch promises with robust error handling
-          emailPromises.push(
-            (async () => {
-              try {
-                console.log(`📧 Sending email #${currentNotifCount + 1}/${maxNotifications} to ${currentNotification.email}`);
+          if (queueResult.success) {
+            console.log(`📧 Email queued #${currentNotifCount + 1}/${maxNotifications} for ${currentNotification.email}`);
                 
-                // Send email
-                const emailResult = await transporter.sendMail(mailOptions);
-                console.log(`📧 ✅ Email sent successfully: ${emailResult.messageId}`);
-                
-                // Calculate new values based on user settings
-                const newNotificationCount = currentNotifCount + 1;
-                let newStatus = 'active';
+            // Calculate new values based on user settings
+            const newNotificationCount = currentNotifCount + 1;
+            let newStatus = 'active';
 
-                // Determine status based on user's max notifications setting
-                if (newNotificationCount >= maxNotifications) {
-                  newStatus = 'max_reached';
-                }
-                
-                // Track email history (non-blocking)
-                try {
-                  await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/email-history`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      notification_id: currentNotification.id,
-                      email_count: newNotificationCount,
-                      appointment_data: matchingResults,
-                      email_subject: emailContent.subject,
-                      email_status: 'sent'
-                    })
-                  });
-                } catch (historyError) {
-                  console.log('📧 ⚠️ Email history tracking failed (non-critical):', historyError instanceof Error ? historyError.message : 'Unknown error');
-                }
-                
-                // Update notification record
-                const { error: updateError } = await supabase
-                  .from('notifications')
-                  .update({
-                    last_notified: new Date().toISOString(),
-                    notification_count: newNotificationCount,
-                    status: newStatus,
-                    updated_at: new Date().toISOString()
-                  })
-                  .eq('id', currentNotification.id);
-                
-                if (updateError) {
-                  console.error(`📧 ❌ Failed to update notification record for ${currentNotification.email}:`, updateError);
-                  throw new Error(`Database update failed: ${updateError.message}`);
-                }
-                
-                console.log(`📧 ✅ Sent email #${newNotificationCount}/${maxNotifications} to ${currentNotification.email} (status: ${newStatus})`);
-                
-                if (newStatus === 'max_reached') {
-                  console.log(`🏁 Notification completed for ${currentNotification.email} - ${maxNotifications} emails sent (user limit reached)`);
-                } else {
-                  console.log(`📧 ⏰ Next notification for ${currentNotification.email} in ${intervalMinutes} minutes (if opportunities found)`);
-                }
-                
-                return { success: true, email: currentNotification.email, count: newNotificationCount, status: newStatus };
-                
-                              } catch (error: any) {
-                console.error(`📧 ❌ Failed to send/update email for ${currentNotification.email}:`, error.message);
-                
-                // Update error count
-                try {
-                  await supabase
-                    .from('notifications')
-                    .update({
-                      error_count: (currentNotification.error_count || 0) + 1,
-                      last_error: error.message,
-                      updated_at: new Date().toISOString()
-                    })
-                    .eq('id', currentNotification.id);
-                } catch (dbError) {
-                  console.error(`📧 ❌ Failed to update error count for ${currentNotification.id}:`, dbError);
-                }
-                
-                return { success: false, email: currentNotification.email, error: error.message };
+            // Determine status based on user's max notifications setting
+            if (newNotificationCount >= maxNotifications) {
+              newStatus = 'max_reached';
+            }
+            
+            // Track email history (queued status)
+            try {
+              await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/email-history`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  notification_id: currentNotification.id,
+                  email_count: newNotificationCount,
+                  appointment_data: matchingResults,
+                  email_subject: emailContent.subject,
+                  email_status: 'queued',
+                  queue_id: queueResult.queueId
+                })
+              });
+            } catch (historyError) {
+              console.log('📧 ⚠️ Email history tracking failed (non-critical):', historyError instanceof Error ? historyError.message : 'Unknown error');
+            }
+            
+            // Update notification record
+            const { error: updateError } = await supabase
+              .from('notifications')
+              .update({
+                last_notified: new Date().toISOString(),
+                notification_count: newNotificationCount,
+                status: newStatus,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', currentNotification.id);
+            
+            if (updateError) {
+              console.error(`📧 ❌ Failed to update notification record for ${currentNotification.email}:`, updateError);
+            } else {
+              console.log(`📧 ✅ Queued email #${newNotificationCount}/${maxNotifications} for ${currentNotification.email} (status: ${newStatus})`);
+              
+              if (newStatus === 'max_reached') {
+                console.log(`🏁 Notification completed for ${currentNotification.email} - ${maxNotifications} emails queued (user limit reached)`);
+              } else {
+                console.log(`📧 ⏰ Next notification for ${currentNotification.email} in ${intervalMinutes} minutes (if opportunities found)`);
               }
-            })()
-          );
+              
+              emailsQueued++;
+            }
+          } else {
+            console.error(`📧 ❌ Failed to queue email for ${currentNotification.email}:`, queueResult.error);
+            emailsSkipped++;
+            
+            // Update error count
+            try {
+              await supabase
+                .from('notifications')
+                .update({
+                  error_count: (currentNotification.error_count || 0) + 1,
+                  last_error: queueResult.error || 'Failed to queue email',
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', currentNotification.id);
+            } catch (dbError) {
+              console.error(`📧 ❌ Failed to update error count for ${currentNotification.id}:`, dbError);
+            }
+          }
 
         } catch (error) {
           console.error(`📧 Error processing notification for ${notification.email}:`, error);
@@ -430,48 +422,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
 
-      // Execute batch of emails with proper result handling
-      if (emailPromises.length > 0) {
-        const results = await Promise.allSettled(emailPromises);
-        
-        // Process results to update counters
-        results.forEach((result, index) => {
-          if (result.status === 'fulfilled') {
-            const emailResult = result.value;
-            if (emailResult.success) {
-              emailsSent++;
-              console.log(`📧 ✅ Batch result: ${emailResult.email} - email #${emailResult.count} (${emailResult.status})`);
-            } else {
-              emailsSkipped++;
-              console.log(`📧 ❌ Batch result: ${emailResult.email} - failed: ${emailResult.error}`);
-            }
-          } else {
-            emailsSkipped++;
-            console.log(`📧 ❌ Batch promise rejected:`, result.reason);
-          }
-        });
-        
-        // Rate limiting: small delay between batches
-        if (i + BATCH_SIZE < notifications.length) {
-          await new Promise(resolve => setTimeout(resolve, 200));
-        }
+      // Small delay between batches to prevent overwhelming the system
+      if (i + BATCH_SIZE < notifications.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
 
-    // Close email transporter
-    transporter.close();
+    // Process any immediate emails from the queue
+    const { processed, errors } = await emailService.processEmailQueue(emailsQueued);
 
     const processingTime = Math.round((Date.now() - processingStart) / 1000);
     console.log(`📧 ✅ EMAIL PROCESSING COMPLETED in ${processingTime}s`);
-    console.log(`📧 📊 Stats: ${emailsSent} sent, ${emailsSkipped} skipped`);
+    console.log(`📧 📊 Stats: ${emailsQueued} queued, ${processed} sent immediately, ${emailsSkipped} skipped`);
 
     return res.status(200).json({
       success: true,
-      emailsSent,
+      emailsQueued,
+      emailsSent: processed,
       emailsSkipped,
       totalProcessed: notifications.length,
       processingTime,
-      message: `Successfully processed ${notifications.length} subscriptions, sent ${emailsSent} emails`
+      message: `Successfully processed ${notifications.length} subscriptions, queued ${emailsQueued} emails (${processed} sent immediately)`
     });
 
   } catch (error) {
