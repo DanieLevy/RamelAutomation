@@ -1,15 +1,10 @@
 import { useRouter } from 'next/router';
 import { Home, Bell, Search } from 'lucide-react';
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useMemo } from 'react';
 
 export default function BottomNavigation() {
   const router = useRouter();
   const currentPath = router.pathname;
-  const navRef = useRef<HTMLDivElement>(null);
-  const [bubbleStyle, setBubbleStyle] = useState<React.CSSProperties>({
-    opacity: 0, // Start hidden until positioned
-  });
-  const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const navItems = useMemo(() => [
     { 
@@ -32,110 +27,45 @@ export default function BottomNavigation() {
     }
   ], [currentPath]);
 
-  useEffect(() => {
-    let retryCount = 0;
-    const maxRetries = 5;
-    
-    const updateBubblePosition = () => {
-      const activeIndex = navItems.findIndex(item => item.active);
-      
-      if (activeIndex >= 0 && buttonRefs.current[activeIndex] && navRef.current) {
-        const button = buttonRefs.current[activeIndex];
-        const nav = navRef.current;
-        
-        if (button && nav) {
-          const buttonRect = button.getBoundingClientRect();
-          const navRect = nav.getBoundingClientRect();
-          
-          // Calculate position relative to nav container
-          const left = buttonRect.left - navRect.left;
-          const top = buttonRect.top - navRect.top;
-          
-          // Verify the position makes sense (not negative or too large)
-          if (left >= 0 && left < navRect.width && top >= 0 && top < navRect.height) {
-            setBubbleStyle({
-              left: `${left}px`,
-              top: `${top}px`,
-              width: `${buttonRect.width}px`,
-              height: `${buttonRect.height}px`,
-              opacity: 1, // Show once positioned
-            });
-            retryCount = maxRetries; // Stop retrying
-          } else if (retryCount < maxRetries) {
-            // Retry if position seems wrong
-            retryCount++;
-            setTimeout(updateBubblePosition, 50 * retryCount);
-          }
-        }
-      }
-    };
-
-    // Initial positioning attempts with increasing delays
-    updateBubblePosition();
-    
-    // Try multiple times to ensure DOM is ready
-    const timers = [
-      setTimeout(updateBubblePosition, 0),
-      setTimeout(updateBubblePosition, 50),
-      setTimeout(updateBubblePosition, 150),
-      setTimeout(updateBubblePosition, 300),
-    ];
-
-    // Update on window resize
-    const handleResize = () => {
-      retryCount = 0;
-      updateBubblePosition();
-    };
-    
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      timers.forEach(timer => clearTimeout(timer));
-    };
-  }, [currentPath, navItems]); // Re-run when path changes
-
   return (
-    <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50">
+    <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-[400px] px-4">
       <nav 
-        ref={navRef}
-        className="relative bg-background/95 backdrop-blur-md border border-border/20 rounded-full px-1.5 py-1.5 shadow-lg overflow-hidden"
-        dir="ltr" // Force LTR for the nav container to ensure consistent positioning
+        className="bg-white dark:bg-gray-900 rounded-[32px] shadow-[0_14px_28px_rgba(143,156,212,0.25),0_10px_10px_rgba(143,156,212,0.22)] dark:shadow-[0_14px_28px_rgba(0,0,0,0.25),0_10px_10px_rgba(0,0,0,0.22)] max-[350px]:max-w-[120px] max-[350px]:pb-5"
+        dir="ltr"
       >
-        {/* Moving bubble background - position absolute to the nav container */}
-        <div 
-          className="absolute bg-primary rounded-full shadow-sm transition-all duration-300 ease-out pointer-events-none"
-          style={{
-            ...bubbleStyle,
-            transform: 'translateZ(0)', // Hardware acceleration
-          }}
-        />
-        
-        <div className="relative flex items-center gap-2">
+        <div className="flex items-center justify-between w-full max-[350px]:flex-col max-[350px]:items-center">
           {navItems.map((item, index) => {
             const Icon = item.icon;
             return (
               <button
                 key={item.href}
-                ref={el => { buttonRefs.current[index] = el; }}
                 onClick={() => router.push(item.href)}
                 className={`
-                  relative flex flex-col items-center justify-center rounded-full w-[44px] h-[44px] 
-                  transition-all duration-200 ease-out z-10
+                  group relative flex flex-col items-center justify-center 
+                  flex-1 min-h-[80px] py-3 max-[350px]:flex-initial max-[350px]:w-full
+                  cursor-pointer transition-all duration-500 ease-out
                   ${item.active 
-                    ? 'text-primary-foreground scale-100' 
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/30 hover:scale-95'
+                    ? 'text-[var(--highlight)] transform -translate-y-[6px]' 
+                    : 'text-[#555] dark:text-gray-400 hover:text-[var(--highlight)] hover:transform hover:-translate-y-[6px]'
                   }
                 `}
                 aria-label={item.label}
-                dir="rtl" // Ensure button content (Hebrew text) is RTL
+                dir="rtl"
               >
-                <Icon className={`transition-all duration-200 ${
-                  item.active ? 'w-5 h-5' : 'w-4 h-4'
-                }`} />
-                <span className={`text-[8px] font-medium leading-none mt-0.5 transition-all duration-200 ${
-                  item.active ? 'opacity-100' : 'opacity-80'
-                }`}>
+                <Icon className={`
+                  w-5 h-5 transition-all duration-300 
+                  ${item.active ? '' : 'group-hover:scale-110'}
+                `} />
+                
+                {/* Text appears only for active item or on hover */}
+                <span className={`
+                  absolute text-[13px] font-medium leading-none
+                  transition-all duration-500 ease-out
+                  ${item.active 
+                    ? 'opacity-100 transform translate-y-[20px] max-[350px]:translate-y-[25px]' 
+                    : 'opacity-0 transform translate-y-[50px] group-hover:opacity-100 group-hover:translate-y-[20px] max-[350px]:group-hover:translate-y-[25px]'
+                  }
+                `}>
                   {item.label}
                 </span>
               </button>

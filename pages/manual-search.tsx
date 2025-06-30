@@ -1,12 +1,8 @@
 import { useState, useEffect } from 'react';
-import Head from 'next/head';
 import { useRouter } from 'next/router';
+import Layout from '@/components/Layout';
 import ManualSearch from '@/components/ManualSearch';
-import OpportunityBanner from '@/components/OpportunityBanner';
-import BottomNavigation from '@/components/BottomNavigation';
-import { ThemeToggle } from '@/components/ui/theme-toggle';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, Search, Wifi, LogOut } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface AppointmentResult {
   date: string;
@@ -21,41 +17,7 @@ export default function ManualSearchPage() {
   const [loading, setLoading] = useState(false);
   const [days, setDays] = useState(7);
   const [searchMode, setSearchMode] = useState<'range' | 'closest'>('range');
-  const [isOnline, setIsOnline] = useState(true);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [authToken, setAuthToken] = useState<string | null>(null);
-
-  useEffect(() => {
-    // Check online status
-    setIsOnline(navigator.onLine);
-    
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    // Load saved authentication from localStorage
-    const savedEmail = localStorage.getItem('ramel_user_email');
-    const savedToken = localStorage.getItem('ramel_auth_token');
-    
-    if (savedEmail && savedToken) {
-      setUserEmail(savedEmail);
-      setAuthToken(savedToken);
-    }
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  const handleDisconnect = () => {
-    localStorage.removeItem('ramel_user_email');
-    localStorage.removeItem('ramel_auth_token');
-    setUserEmail(null);
-    setAuthToken(null);
-  };
+  const { userEmail } = useAuth();
 
   const checkAppointments = async () => {
     setLoading(true);
@@ -109,78 +71,19 @@ export default function ManualSearchPage() {
   };
 
   return (
-    <div className="bg-background min-h-screen pb-24">
-      <Head>
-        <title>חיפוש ידני | תורים לרם-אל</title>
-        <meta name="description" content="חפש תורים פנויים במספרת רם-אל" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-        <meta name="theme-color" content="#FFFFFF" id="theme-color-meta" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <link rel="icon" href="/favicon.ico" />
-      </Head>
-
-      <div className="page-container mx-auto px-4 py-5 max-w-screen-sm" dir="rtl">
-        {/* Header */}
-        <header className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <img 
-                  src="/icons/icon-72x72.png" 
-                  alt="תור רם-אל"
-                  className="w-11 h-11 rounded-xl shadow-sm"
-                />
-                <div className="absolute inset-0 rounded-xl bg-gradient-to-tr from-white/20 to-transparent dark:from-black/20"></div>
-              </div>
-              
-              <div>
-                <h1 className="text-lg font-bold mb-0.5 leading-none">
-                  חיפוש ידני
-                </h1>
-                <p className="text-xs text-muted-foreground">חפש תורים פנויים בתאריכים הקרובים</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              {userEmail && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleDisconnect}
-                  className="h-7 px-2"
-                  title="התנתק"
-                >
-                  <LogOut className="w-4 h-4" />
-                </Button>
-              )}
-              <ThemeToggle className="w-7 h-7" />
-              {!isOnline && (
-                <div className="text-muted-foreground" title="אופליין">
-                  <Wifi className="w-5 h-5" />
-                </div>
-              )}
-            </div>
-          </div>
-          
-          <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent mb-4"></div>
-        </header>
-
-        {/* Manual Search Component */}
-        <div className="space-y-4">
-          <ManualSearch
-            results={results}
-            loading={loading}
-            days={days}
-            setDays={setDays}
-            searchMode={searchMode}
-            setSearchMode={setSearchMode}
-            onCheckAppointments={checkAppointments}
-          />
-        </div>
+    <Layout title="חיפוש ידני | תורים לרם-אל" description="חפש תורים פנויים במספרת רם-אל">
+      {/* Manual Search Component */}
+      <div className="space-y-4">
+        <ManualSearch
+          results={results}
+          loading={loading}
+          days={days}
+          setDays={setDays}
+          searchMode={searchMode}
+          setSearchMode={setSearchMode}
+          onCheckAppointments={checkAppointments}
+        />
       </div>
-
-      <BottomNavigation />
-    </div>
+    </Layout>
   );
 } 

@@ -169,38 +169,28 @@ export default function SubscriptionManager({ userEmail, onDisconnect }: Subscri
 
   return (
     <div className="space-y-6">
-      {/* User Status Header */}
-      <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800/30 rounded-xl p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
-              <CheckCircle className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <p className="font-medium text-green-800 dark:text-green-200">מחובר כ-{userEmail}</p>
-              <p className="text-sm text-green-600 dark:text-green-400">
-                {subscriptions.length} התראות רשומות
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowDetailed(!showDetailed)}
-              className="text-green-700 dark:text-green-300"
-            >
-              {showDetailed ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onDisconnect}
-              className="text-green-700 dark:text-green-300"
-            >
-              התנתק
-            </Button>
-          </div>
+      {/* Subscriptions Header */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold">ההתראות שלי</h2>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowDetailed(!showDetailed)}
+            className="h-8 px-2"
+          >
+            {showDetailed ? (
+              <>
+                <EyeOff className="w-4 h-4 ml-1" />
+                הסתר פרטים
+              </>
+            ) : (
+              <>
+                <Eye className="w-4 h-4 ml-1" />
+                הצג פרטים
+              </>
+            )}
+          </Button>
         </div>
       </div>
 

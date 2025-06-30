@@ -29,6 +29,9 @@
 
 @layer base {
   :root {
+    /* Custom highlight color for navigation */
+    --highlight: #5756e6;
+    
     /* New Minimal Color Palette */
     --background: 0 0% 98%; /* #fafafa - very light grey background */
     --foreground: 0 0% 9%; /* #171717 - dark text */

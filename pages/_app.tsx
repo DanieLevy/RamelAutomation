@@ -2,6 +2,7 @@ import '../styles/globals.css'
 import type { AppProps } from 'next/app'
 import Head from 'next/head'
 import { useEffect, useState } from 'react'
+import { AuthProvider } from '@/contexts/AuthContext'
 
 // Custom ThemeProvider implementation
 function ThemeProvider({ children }: { children: React.ReactNode }) {
@@ -70,8 +71,9 @@ export default function App({ Component, pageProps }: AppProps) {
   }
 
   return (
-    <ThemeProvider>
-      <Head>
+    <AuthProvider>
+      <ThemeProvider>
+        <Head>
         {/* Preload Hebrew fonts for better performance */}
         <link
           rel="preload"
@@ -149,5 +151,6 @@ export default function App({ Component, pageProps }: AppProps) {
         <Component {...pageProps} />
       </div>
     </ThemeProvider>
+    </AuthProvider>
   )
 } 
