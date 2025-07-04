@@ -1,9 +1,6 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { Badge } from './ui/badge';
-import { Button } from './ui/button';
-import { Calendar, Clock, ExternalLink, RefreshCw, Loader2, Search } from 'lucide-react';
+import { Calendar, ExternalLink } from 'lucide-react';
 
 interface AppointmentResult {
   date: string;
@@ -37,7 +34,6 @@ interface OpportunityBannerProps {
 export default function OpportunityBanner({ onRefresh }: OpportunityBannerProps) {
   const [cachedResult, setCachedResult] = useState<CachedResult | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     loadCachedResults();
@@ -100,40 +96,10 @@ export default function OpportunityBanner({ onRefresh }: OpportunityBannerProps)
     return `${baseUrl}?${params.toString()}`;
   };
 
-  const refreshOpportunities = async () => {
-    setIsRefreshing(true);
-    console.log('🔄 Starting manual refresh...');
-    try {
-      const response = await fetch('/api/check-appointments', { 
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ 
-          mode: 'range',
-          days: 30
-        })
-      });
-      
-      const data = await response.json();
-      console.log('📊 Manual refresh response:', data);
-      
-      // Small delay to ensure cache is written
-      setTimeout(() => {
-        console.log('🔄 Reloading page...');
-        window.location.reload();
-      }, 500);
-    } catch (error) {
-      console.error('Failed to refresh:', error);
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
   if (loading) {
     return (
-      <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 mb-4 animate-pulse">
-        <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/2"></div>
+      <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 mb-4 animate-pulse">
+        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
       </div>
     );
   }
@@ -148,8 +114,8 @@ export default function OpportunityBanner({ onRefresh }: OpportunityBannerProps)
   
   if (!hasAppointments) {
     return (
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
-        <p className="text-yellow-800">
+      <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 mb-4">
+        <p className="text-yellow-800 dark:text-yellow-200 text-sm text-center">
           לא נמצאו תורים זמינים ב-30 הימים הקרובים
         </p>
       </div>
@@ -158,91 +124,43 @@ export default function OpportunityBanner({ onRefresh }: OpportunityBannerProps)
 
   // Get the nearest appointment (first in sorted array)
   const nearestAppointment = appointments[0];
-  const totalAvailable = cachedResult.count || appointments.length;
   
   return (
-    <motion.div
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="relative overflow-hidden bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg shadow-lg p-6 mb-6"
-    >
-      <div className="relative z-10">
-        <h2 className="text-2xl font-bold text-white mb-4 flex items-center">
-          <Calendar className="ml-2" size={28} />
-          תורים זמינים!
-        </h2>
-        
-        {nearestAppointment && (
-          <div className="bg-white/20 backdrop-blur-sm rounded-lg p-4 mb-4">
-            <p className="text-white font-semibold text-lg mb-2">
-              התור הקרוב ביותר:
+    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3 mb-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 flex-1">
+          <Calendar className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-green-800 dark:text-green-200">
+              {getDayNameHebrew(nearestAppointment.date)}, {formatHebrewDate(nearestAppointment.date)}
             </p>
-            <div className="flex items-center gap-3 text-white">
-              <Calendar className="w-5 h-5" />
-              <span className="font-medium">
-                {getDayNameHebrew(nearestAppointment.date)}, {formatHebrewDate(nearestAppointment.date)}
-              </span>
-            </div>
-            {nearestAppointment.times && nearestAppointment.times.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-2">
-                {nearestAppointment.times.slice(0, 4).map((time: string) => (
-                  <span key={time} className="bg-white/30 px-3 py-1 rounded-full text-sm">
+            <div className="flex items-center gap-2 mt-1">
+              <div className="flex flex-wrap gap-1">
+                {nearestAppointment.times.slice(0, 3).map((time: string) => (
+                  <span key={time} className="bg-green-100 dark:bg-green-800/50 text-green-700 dark:text-green-300 px-2 py-0.5 rounded text-xs font-medium">
                     {time}
                   </span>
                 ))}
-                {nearestAppointment.times.length > 4 && (
-                  <span className="bg-white/30 px-3 py-1 rounded-full text-sm">
-                    +{nearestAppointment.times.length - 4}{' '}נוספים
+                {nearestAppointment.times.length > 3 && (
+                  <span className="text-green-600 dark:text-green-400 text-xs">
+                    +{nearestAppointment.times.length - 3}
                   </span>
                 )}
               </div>
-            )}
-          </div>
-        )}
-        
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <p className="text-white/90 text-sm">
-              סה&quot;כ {totalAvailable} תורים זמינים ב-30 הימים הקרובים
-            </p>
-            {cachedResult.meta?.updatedAt && (
-              <p className="text-white/70 text-xs mt-1">
-                עודכן {new Date(cachedResult.meta.updatedAt).toLocaleTimeString('he-IL')}
-              </p>
-            )}
-          </div>
-          
-          <div className="flex gap-3 w-full sm:w-auto">
-            <button
-              onClick={refreshOpportunities}
-              disabled={isRefreshing}
-              className="flex-1 sm:flex-initial bg-white/20 hover:bg-white/30 text-white font-semibold py-2 px-4 rounded-full transition duration-300 flex items-center justify-center backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              title="רענן תורים זמינים"
-            >
-              {isRefreshing ? (
-                <>
-                  <Loader2 className="animate-spin ml-2" size={18} />
-                  מרענן...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="ml-2" size={18} />
-                  רענן
-                </>
-              )}
-            </button>
-            
-            <Link 
-              href="/manual-search" 
-              className="flex-1 sm:flex-initial bg-white text-blue-600 hover:bg-blue-50 font-semibold py-2 px-4 rounded-full transition duration-300 flex items-center justify-center"
-            >
-              <Search className="ml-2" size={18} />
-              חיפוש מתקדם
-            </Link>
+            </div>
           </div>
         </div>
+        
+        <a
+          href={generateBookingUrl(nearestAppointment.date)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 text-white px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1 transition-colors whitespace-nowrap"
+        >
+          קבע תור
+          <ExternalLink className="w-3 h-3" />
+        </a>
       </div>
-    </motion.div>
+    </div>
   );
 } 
