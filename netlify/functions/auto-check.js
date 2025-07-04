@@ -183,16 +183,20 @@ async function checkSingleDateWithRetry(dateStr, retryCount = 0) {
   // Check cache first
   if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
     performanceMetrics.cacheHits++
+    console.log(`💾 Cache hit for ${dateStr}`)
     return cached.data
   }
   
   performanceMetrics.cacheMisses++
+  console.log(`🔍 Checking ${dateStr} (attempt ${retryCount + 1})...`)
   
   try {
     const startTime = Date.now()
     
     const userId = process.env.USER_ID || '4481'
     const codeAuth = process.env.CODE_AUTH || 'Sa1W2GjL'
+    
+    console.log(`🔐 Using credentials: userId=${userId}, codeAuth=${codeAuth.substring(0, 4)}****`)
     
     const params = {
       i: 'cmFtZWwzMw==', // ramel33
@@ -202,7 +206,10 @@ async function checkSingleDateWithRetry(dateStr, retryCount = 0) {
       datef: dateStr
     }
 
-    const response = await axiosInstance.get('https://mytor.co.il/home.php', {
+    const url = 'https://mytor.co.il/home.php'
+    console.log(`🌐 Fetching: ${url}?${new URLSearchParams(params).toString()}`)
+
+    const response = await axiosInstance.get(url, {
       params,
       headers: {
         'Cookie': `userID=${userId}; codeAuth=${codeAuth}`,
@@ -212,6 +219,8 @@ async function checkSingleDateWithRetry(dateStr, retryCount = 0) {
 
     performanceMetrics.apiCalls++
     performanceMetrics.totalResponseTime += (Date.now() - startTime)
+    
+    console.log(`📡 Response received for ${dateStr}: status=${response.status}, size=${response.data.length} bytes`)
 
     // Enhanced cheerio loading with error handling
     let $
@@ -226,9 +235,17 @@ async function checkSingleDateWithRetry(dateStr, retryCount = 0) {
       throw new Error('Failed to parse HTML response')
     }
     
+    // Log page title to verify we're on the right page
+    const pageTitle = $('title').text()
+    console.log(`📄 Page title for ${dateStr}: "${pageTitle}"`)
+    
     // Enhanced appointment detection
     const dangerText = $('h4.tx-danger').text()
     const alertText = $('.alert-danger').text()
+    
+    console.log(`🔍 Danger text: "${dangerText}"`)
+    console.log(`🔍 Alert text: "${alertText}"`)
+    
     const noAppointmentsMessages = [
       'לא נשארו תורים פנויים',
       'אין תורים זמינים',
@@ -240,6 +257,7 @@ async function checkSingleDateWithRetry(dateStr, retryCount = 0) {
     )
     
     if (hasNoAppointments) {
+      console.log(`❌ No appointments message found for ${dateStr}`)
       const result = { date: dateStr, available: false, times: [], message: 'No appointments available' }
       responseCache.set(cacheKey, { data: result, timestamp: Date.now() })
       cleanupCache()
@@ -255,17 +273,35 @@ async function checkSingleDateWithRetry(dateStr, retryCount = 0) {
       '.appointment-time'
     ]
     
+    console.log(`🔍 Looking for time buttons with selectors...`)
+    
     for (const selector of timeSelectors) {
       const timeButtons = $(selector)
+      console.log(`   ${selector}: found ${timeButtons.length} elements`)
+      
       if (timeButtons.length > 0) {
         for (let i = 0; i < timeButtons.length; i++) {
-          const timeText = $(timeButtons[i]).text().trim()
+          const element = $(timeButtons[i])
+          const timeText = element.text().trim()
+          const elementHtml = element.html()
+          console.log(`     Element ${i}: text="${timeText}", html="${elementHtml?.substring(0, 100)}..."`)
+          
           if (/^\d{1,2}:\d{2}$/.test(timeText) && !availableTimes.includes(timeText)) {
             availableTimes.push(timeText)
+            console.log(`     ✅ Valid time found: ${timeText}`)
           }
         }
         break // Use first successful selector
       }
+    }
+    
+    // If no times found with selectors, let's check the raw HTML
+    if (availableTimes.length === 0) {
+      console.log(`🔍 No times found with selectors, checking raw HTML...`)
+      const htmlContent = $.html()
+      const timePattern = /\b([0-9]{1,2}:[0-9]{2})\b/g
+      const matches = htmlContent.match(timePattern) || []
+      console.log(`   Found ${matches.length} time patterns in HTML: ${matches.slice(0, 5).join(', ')}...`)
     }
 
     const result = {
@@ -275,6 +311,8 @@ async function checkSingleDateWithRetry(dateStr, retryCount = 0) {
       message: availableTimes.length > 0 ? `Found ${availableTimes.length} appointments` : 'No appointments found'
     }
     
+    console.log(`📊 Result for ${dateStr}: ${result.available ? '✅' : '❌'} ${result.message}`)
+    
     // Cache successful results
     responseCache.set(cacheKey, { data: result, timestamp: Date.now() })
     cleanupCache()
@@ -283,6 +321,7 @@ async function checkSingleDateWithRetry(dateStr, retryCount = 0) {
   } catch (error) {
     performanceMetrics.errors++
     console.error(`❌ Error checking ${dateStr} (attempt ${retryCount + 1}):`, error.message)
+    console.error(`   Error details:`, error.response?.status, error.response?.statusText)
     
     // Retry logic for transient errors
     if (retryCount < maxRetries && isRetryableError(error)) {
@@ -322,16 +361,20 @@ const isRetryableError = (error) => {
 // ENHANCED: Appointment finding with intelligent batching and recovery
 async function findAppointmentsEnhanced() {
   console.log('🚀 ENHANCED AUTO-CHECK: Starting robust appointment search')
+  console.log(`📅 Current Israel time: ${new Date().toLocaleString('he-IL', { timeZone: ISRAEL_TIMEZONE })}`)
   const startTime = Date.now()
   
   // Reset performance metrics
   Object.keys(performanceMetrics).forEach(key => performanceMetrics[key] = 0)
   
   const currentDate = getCurrentDateIsrael()
+  console.log(`📅 Starting from date: ${formatDateIsrael(currentDate)}`)
+  
   const maxDays = 365 // Check up to a year ahead to find any available appointment
   const openDates = getOpenDays(currentDate, maxDays)
   
   console.log(`📊 Will check ${openDates.length} open dates (up to 1 year ahead) to find first available appointment`)
+  console.log(`📊 First 5 dates to check: ${openDates.slice(0, 5).map(d => formatDateIsrael(d)).join(', ')}`)
   
   // INTELLIGENT CACHE CHECK: Look for recent cached results first
   const recentResults = []
@@ -351,6 +394,7 @@ async function findAppointmentsEnhanced() {
   if (recentResults.length > 0) {
     const elapsed = Math.round((Date.now() - startTime) / 1000)
     console.log(`🎯 CACHE HIT: Found ${recentResults.length} appointments in ${elapsed}s`)
+    console.log(`🎯 Cached appointments:`, JSON.stringify(recentResults, null, 2))
     
     return {
       success: true,
@@ -376,6 +420,8 @@ async function findAppointmentsEnhanced() {
     const batch = openDates.slice(i, i + BATCH_SIZE)
     const batchStartTime = Date.now()
     
+    console.log(`📦 Processing batch ${Math.floor(i/BATCH_SIZE) + 1}: ${batch.map(d => formatDateIsrael(d)).join(', ')}`)
+    
     const batchPromises = batch.map(date => {
       const dateStr = formatDateIsrael(date)
       return checkSingleDateWithRetry(dateStr)
@@ -387,7 +433,12 @@ async function findAppointmentsEnhanced() {
     batchResults.forEach((result, idx) => {
       if (result.status === 'fulfilled') {
         results.push(result.value)
-        if (result.value.available) foundAny = true
+        if (result.value.available) {
+          foundAny = true
+          console.log(`✅ Found available appointment on ${result.value.date}: ${result.value.times.length} slots [${result.value.times.join(', ')}]`)
+        } else {
+          console.log(`❌ No appointments on ${result.value.date}`)
+        }
       } else {
         console.error(`🚨 Batch item failed:`, result.reason)
         results.push({
@@ -439,6 +490,12 @@ async function findAppointmentsEnhanced() {
   console.log(`✅ Enhanced check completed: ${results.length} checked, ${availableResults.length} available, ${errorResults.length} errors in ${elapsed}s`)
   console.log(`📊 Performance: ${performanceMetrics.cacheHits} cache hits, ${performanceMetrics.apiCalls} API calls, avg response: ${Math.round(performanceMetrics.totalResponseTime / Math.max(performanceMetrics.apiCalls, 1))}ms`)
   
+  if (availableResults.length > 0) {
+    console.log(`🎯 Available appointments found:`, JSON.stringify(availableResults, null, 2))
+  } else {
+    console.log(`❌ No available appointments found after checking ${results.length} dates`)
+  }
+  
   return {
     success: true,
     found: availableResults.length > 0,
@@ -483,6 +540,7 @@ async function updateExpiredSubscriptions() {
 exports.handler = async (event, context) => {
   try {
     console.log('🚀 AUTO-CHECK: Starting hyper-optimized execution')
+    console.log(`🔧 Environment: URL=${process.env.URL}, DEPLOY_URL=${process.env.DEPLOY_URL}`)
     const functionStart = Date.now()
     
     // PARALLEL EXECUTION: Start both operations simultaneously
@@ -495,6 +553,13 @@ exports.handler = async (event, context) => {
       throw new Error('Failed to check appointments')
     }
     
+    console.log(`📊 Appointment results summary:`, {
+      success: appointmentResults.success,
+      found: appointmentResults.found,
+      appointmentCount: appointmentResults.appointments.length,
+      firstAppointment: appointmentResults.appointments[0] || null
+    })
+    
     // MINIMAL DATABASE WRITE: Only store essential data
     const essentialData = {
       timestamp: Date.now(),
@@ -505,12 +570,26 @@ exports.handler = async (event, context) => {
       preview: appointmentResults.appointments.slice(0, 5)
     }
     
+    console.log(`💾 Saving to cache:`, JSON.stringify(essentialData, null, 2))
+    
     // Non-blocking cache write
     supabase
       .from('cache')
-      .upsert([{ key: 'auto-check-minimal', value: essentialData }])
-      .then(() => console.log('Cache updated'))
-      .catch(err => console.error('Cache error:', err))
+      .upsert([{ 
+        key: 'auto-check-minimal', 
+        value: essentialData,
+        updated_at: new Date().toISOString()
+      }], {
+        onConflict: 'key'
+      })
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('❌ Cache write error:', error)
+        } else {
+          console.log('✅ Cache updated successfully')
+        }
+      })
+      .catch(err => console.error('❌ Cache error:', err))
     
     const totalTime = Math.round((Date.now() - functionStart) / 1000)
     console.log(`⚡ FUNCTION COMPLETED in ${totalTime}s (target: <8s)`)
@@ -525,6 +604,8 @@ exports.handler = async (event, context) => {
       try {
         // Call the email processing API to queue notifications
         const emailApiUrl = process.env.DEPLOY_URL || process.env.URL || 'https://tor-ramel.netlify.app';
+        console.log(`📧 Calling email API at: ${emailApiUrl}/api/process-notifications`);
+        
         const response = await fetch(`${emailApiUrl}/api/process-notifications`, {
           method: 'POST',
           headers: {
@@ -555,6 +636,26 @@ exports.handler = async (event, context) => {
       console.log('📧 No appointments found - skipping email processing');
     }
     
+    const responseBody = {
+      success: true,
+      executionTime: totalTime,
+      data: {
+        found: appointmentResults.found,
+        appointmentCount: appointmentResults.appointments.length,
+        summary: appointmentResults.summary,
+        appointments: appointmentResults.appointments,
+        emailProcessing: emailProcessingResult
+      },
+      meta: {
+        cacheKey: 'auto-check-minimal',
+        nextCheckIn: '5 minutes',
+        optimizedFor: 'speed',
+        executionTarget: '<8 seconds'
+      }
+    }
+    
+    console.log(`📤 Returning response:`, JSON.stringify(responseBody, null, 2))
+    
     return {
       statusCode: 200,
       headers: {
@@ -562,28 +663,13 @@ exports.handler = async (event, context) => {
         'Access-Control-Allow-Origin': '*',
         'Cache-Control': 'public, max-age=30' // Shorter cache for real-time updates
       },
-      body: JSON.stringify({
-        success: true,
-        executionTime: totalTime,
-        data: {
-          found: appointmentResults.found,
-          appointmentCount: appointmentResults.appointments.length,
-          summary: appointmentResults.summary,
-          appointments: appointmentResults.appointments,
-          emailProcessing: emailProcessingResult
-        },
-        meta: {
-          cacheKey: 'auto-check-minimal',
-          nextCheckIn: '5 minutes',
-          optimizedFor: 'speed',
-          executionTarget: '<8 seconds'
-        }
-      })
+      body: JSON.stringify(responseBody)
     }
     
   } catch (error) {
     const totalTime = Math.round((Date.now() - functionStart) / 1000)
     console.error(`❌ FUNCTION FAILED in ${totalTime}s:`, error.message)
+    console.error(`❌ Stack trace:`, error.stack)
     
     return {
       statusCode: 500,

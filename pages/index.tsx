@@ -12,8 +12,9 @@ export default function Home() {
   const { userEmail, setAuth, clearAuth } = useAuth();
 
   const refreshOpportunities = async () => {
+    console.log('🔄 Starting manual refresh...');
     try {
-      await fetch('/api/check-appointments', { 
+      const response = await fetch('/api/check-appointments', { 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -23,8 +24,14 @@ export default function Home() {
           days: 365         // Check up to a year ahead
         })
       });
+      
+      const data = await response.json();
+      console.log('📊 Manual refresh response:', data);
+      console.log('📊 First appointment:', data.results?.[0] || data.summary?.earliestAvailable);
+      
       // Small delay to ensure cache is written
       setTimeout(() => {
+        console.log('🔄 Reloading page...');
         window.location.reload();
       }, 500);
     } catch (error) {

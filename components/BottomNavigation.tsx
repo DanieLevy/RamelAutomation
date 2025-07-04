@@ -8,10 +8,10 @@ export default function BottomNavigation() {
 
   const navItems = useMemo(() => [
     { 
-      href: '/manual-search', 
-      icon: Search, 
-      label: 'חיפוש',
-      active: currentPath === '/manual-search'
+      href: '/', 
+      icon: Home, 
+      label: 'בית',
+      active: currentPath === '/'
     },
     { 
       href: '/notifications', 
@@ -20,54 +20,78 @@ export default function BottomNavigation() {
       active: currentPath === '/notifications'
     },
     { 
-      href: '/', 
-      icon: Home, 
-      label: 'בית',
-      active: currentPath === '/'
+      href: '/manual-search', 
+      icon: Search, 
+      label: 'חיפוש',
+      active: currentPath === '/manual-search'
     }
   ], [currentPath]);
 
   return (
-    <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-[400px] px-4">
+    <div className="fixed bottom-0 left-0 right-0 z-50 pb-safe">
+      {/* Background blur effect for iOS-style appearance */}
+      <div className="absolute inset-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl" />
+      
+      {/* Navigation container */}
       <nav 
-        className="bg-white dark:bg-gray-900 rounded-[32px] shadow-[0_14px_28px_rgba(143,156,212,0.25),0_10px_10px_rgba(143,156,212,0.22)] dark:shadow-[0_14px_28px_rgba(0,0,0,0.25),0_10px_10px_rgba(0,0,0,0.22)] max-[350px]:max-w-[120px] max-[350px]:pb-5"
-        dir="ltr"
+        className="relative mx-auto max-w-lg px-4 sm:px-6"
+        dir="rtl"
       >
-        <div className="flex items-center justify-between w-full max-[350px]:flex-col max-[350px]:items-center">
-          {navItems.map((item, index) => {
+        {/* Top border for visual separation */}
+        <div className="absolute top-0 left-4 right-4 h-px bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-700 to-transparent" />
+        
+        {/* Navigation items container */}
+        <div className="flex items-center justify-around py-2">
+          {navItems.map((item) => {
             const Icon = item.icon;
             return (
               <button
                 key={item.href}
                 onClick={() => router.push(item.href)}
                 className={`
-                  group relative flex flex-col items-center justify-center 
-                  flex-1 min-h-[80px] py-3 max-[350px]:flex-initial max-[350px]:w-full
-                  cursor-pointer transition-all duration-500 ease-out
+                  relative flex flex-col items-center justify-center 
+                  min-w-[64px] py-2 px-3 rounded-xl
+                  transition-all duration-200 ease-out
                   ${item.active 
-                    ? 'text-[var(--highlight)] transform -translate-y-[6px]' 
-                    : 'text-[#555] dark:text-gray-400 hover:text-[var(--highlight)] hover:transform hover:-translate-y-[6px]'
+                    ? 'text-[var(--highlight)]' 
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                   }
+                  group
                 `}
                 aria-label={item.label}
-                dir="rtl"
+                aria-current={item.active ? 'page' : undefined}
               >
+                {/* Active indicator background */}
+                {item.active && (
+                  <div className="absolute inset-0 bg-[var(--highlight)]/10 rounded-xl scale-110 animate-fade-in" />
+                )}
+                
+                {/* Icon */}
                 <Icon className={`
-                  w-5 h-5 transition-all duration-300 
-                  ${item.active ? '' : 'group-hover:scale-110'}
+                  relative w-6 h-6 mb-1
+                  transition-all duration-200
+                  ${item.active 
+                    ? 'scale-110' 
+                    : 'group-hover:scale-105 group-active:scale-95'
+                  }
                 `} />
                 
-                {/* Text appears only for active item or on hover */}
+                {/* Label */}
                 <span className={`
-                  absolute text-[13px] font-medium leading-none
-                  transition-all duration-500 ease-out
+                  relative text-xs font-medium
+                  transition-all duration-200
                   ${item.active 
-                    ? 'opacity-100 transform translate-y-[20px] max-[350px]:translate-y-[25px]' 
-                    : 'opacity-0 transform translate-y-[50px] group-hover:opacity-100 group-hover:translate-y-[20px] max-[350px]:group-hover:translate-y-[25px]'
+                    ? 'opacity-100' 
+                    : 'opacity-70 group-hover:opacity-100'
                   }
                 `}>
                   {item.label}
                 </span>
+                
+                {/* Active dot indicator */}
+                {item.active && (
+                  <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-[var(--highlight)] rounded-full" />
+                )}
               </button>
             );
           })}

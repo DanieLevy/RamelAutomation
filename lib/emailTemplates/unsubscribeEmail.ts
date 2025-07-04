@@ -1,4 +1,4 @@
-// Unsubscribe confirmation email template
+// Modern minimal unsubscribe confirmation email template
 export const generateUnsubscribeEmailTemplate = ({
   userEmail,
   resubscribeUrl
@@ -7,7 +7,8 @@ export const generateUnsubscribeEmailTemplate = ({
   resubscribeUrl: string;
 }): { subject: string; html: string; text: string } => {
   
-  const subject = '📵 הפסקת התראות Tor-RamEl';
+  const subject = 'ההתראות הופסקו - Tor-RamEl';
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app';
   
   const html = `
     <!DOCTYPE html>
@@ -15,198 +16,243 @@ export const generateUnsubscribeEmailTemplate = ({
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>התראות הופסקו</title>
-      <style>
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
+      <meta name="color-scheme" content="light">
+      <meta name="supported-color-schemes" content="light">
+      <title>התראות הופסקו - Tor-RamEl</title>
+      <!--[if mso]>
+      <noscript>
+        <xml>
+          <o:OfficeDocumentSettings>
+            <o:PixelsPerInch>96</o:PixelsPerInch>
+          </o:OfficeDocumentSettings>
+        </xml>
+      </noscript>
+      <![endif]-->
+      <style type="text/css">
+        /* CSS Reset */
+        body, table, td, div, p, a { 
+          -webkit-text-size-adjust: 100%; 
+          -ms-text-size-adjust: 100%; 
+        }
+        table, td { 
+          mso-table-lspace: 0pt; 
+          mso-table-rspace: 0pt; 
+        }
+        img { 
+          -ms-interpolation-mode: bicubic; 
+          border: 0; 
+          outline: none; 
+          text-decoration: none; 
         }
         
+        /* Base Styles */
         body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          line-height: 1.5;
-          color: #1a202c;
-          background: #f7fafc;
-          padding: 16px;
+          margin: 0 !important;
+          padding: 0 !important;
+          min-width: 100% !important;
+          background-color: #f3f4f6;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
           direction: rtl;
         }
         
-        .container {
-          max-width: 480px;
-          margin: 0 auto;
-          background: white;
-          border-radius: 12px;
-          overflow: hidden;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        /* Typography */
+        h1, h2, h3, p {
+          margin: 0;
+          padding: 0;
         }
         
-        .header {
-          background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%);
-          color: white;
-          padding: 24px 20px;
-          text-align: center;
-        }
-        
-        .icon {
-          font-size: 32px;
-          margin-bottom: 8px;
-        }
-        
-        .logo {
-          font-size: 20px;
-          font-weight: 700;
-          margin-bottom: 4px;
-        }
-        
-        .subtitle {
-          font-size: 14px;
-          opacity: 0.9;
-        }
-        
-        .body {
-          padding: 24px 20px;
-          text-align: center;
-        }
-        
-        .message {
-          font-size: 16px;
-          color: #2d3748;
-          margin-bottom: 16px;
-        }
-        
-        .submessage {
-          font-size: 14px;
-          color: #4a5568;
-          margin-bottom: 24px;
-        }
-        
-        .info-box {
-          background: #fef5e7;
-          border: 1px solid #f6ad55;
-          border-radius: 8px;
-          padding: 16px;
-          margin-bottom: 20px;
-        }
-        
-        .info-text {
-          font-size: 14px;
-          color: #c05621;
-        }
-        
-        .buttons {
-          display: flex;
-          gap: 8px;
-          justify-content: center;
-          margin: 20px 0;
-        }
-        
-        .btn {
-          padding: 10px 16px;
-          border-radius: 6px;
+        /* Links */
+        a {
+          color: #2563EB;
           text-decoration: none;
-          font-size: 14px;
-          font-weight: 600;
-          display: inline-block;
         }
         
-        .btn-primary {
-          background: #3182ce;
-          color: white;
+        /* Hover Effects */
+        @media (hover: hover) {
+          .btn-primary:hover {
+            background-color: #1D4ED8 !important;
+          }
+          .btn-secondary:hover {
+            background-color: #E5E7EB !important;
+          }
         }
         
-        .btn-secondary {
-          background: #e2e8f0;
-          color: #4a5568;
-        }
-        
-        .footer {
-          background: #f7fafc;
-          padding: 16px;
-          text-align: center;
-          border-top: 1px solid #e2e8f0;
-        }
-        
-        .footer-text {
-          font-size: 12px;
-          color: #718096;
-        }
-        
-        .footer-link {
-          color: #3182ce;
-          text-decoration: none;
-          margin: 0 4px;
-        }
-        
-        @media (max-width: 480px) {
+        /* Mobile Responsive */
+        @media only screen and (max-width: 600px) {
           .container {
-            margin: 8px;
-            border-radius: 8px;
+            width: 100% !important;
+            max-width: 100% !important;
           }
-          
-          .buttons {
-            flex-direction: column;
+          .content-section {
+            padding: 16px !important;
           }
-          
           .btn {
-            width: 100%;
-            text-align: center;
+            display: block !important;
+            width: 100% !important;
           }
         }
       </style>
     </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <div class="icon">📵</div>
-          <div class="logo">Tor-RamEl</div>
-          <div class="subtitle">מערכת התראות חכמה</div>
+    <body style="margin:0;padding:0;word-spacing:normal;background-color:#f3f4f6;">
+      <div role="article" aria-roledescription="email" lang="he" dir="rtl" style="text-size-adjust:100%;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
+        
+        <!--[if mso]>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr><td align="center">
+        <![endif]-->
+        
+        <!-- Preheader Text -->
+        <div style="display:none;font-size:1px;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;mso-hide:all;">
+          ההתראות הופסקו. לא תקבל יותר התראות על תורים פנויים ברם-אל.
         </div>
         
-        <div class="body">
-          <div class="message">
-            ההתראות הופסקו בהצלחה
-          </div>
-          
-          <div class="submessage">
-            לא תקבל יותר התראות על תורים פנויים ברם-אל.
-          </div>
-          
-          <div class="info-box">
-            <div class="info-text">
-              💡 אם תרצה להירשם שוב בעתיד, תוכל לחזור לאתר ולהירשם מחדש בכל עת.
-            </div>
-          </div>
-          
-          <div class="buttons">
-            <a href="https://tor-ramel.netlify.app" class="btn btn-primary">🏠 אתר ראשי</a>
-            <a href="${resubscribeUrl}" class="btn btn-secondary">🔄 הירשם שוב</a>
-          </div>
-        </div>
+        <!-- Main Container -->
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto;padding:20px 0;width:100%;max-width:600px;">
+          <tr>
+            <td>
+              <!-- Email Container -->
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+                
+                <!-- Header -->
+                <tr>
+                  <td style="padding:24px 24px 20px 24px;text-align:center;">
+                    <div style="font-size:40px;margin-bottom:12px;">👋</div>
+                    <h1 style="font-size:24px;font-weight:600;color:#111827;margin-bottom:8px;">ההתראות הופסקו</h1>
+                    <p style="font-size:14px;color:#6B7280;">לא תקבל יותר התראות מ-Tor-RamEl</p>
+                  </td>
+                </tr>
+                
+                <!-- Divider -->
+                <tr>
+                  <td style="padding:0 24px;">
+                    <div style="height:1px;background-color:#E5E7EB;"></div>
+                  </td>
+                </tr>
+                
+                <!-- Main Content -->
+                <tr>
+                  <td class="content-section" style="padding:32px 24px;">
+                    
+                    <!-- Confirmation Message -->
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:32px;">
+                      <tr>
+                        <td align="center">
+                          <div style="background-color:#FEF3C7;color:#92400E;padding:16px;border-radius:6px;margin-bottom:24px;">
+                            <p style="font-size:14px;line-height:1.5;">
+                              <strong>ההרשמה שלך בוטלה בהצלחה</strong><br>
+                              לא נשלח לך יותר התראות על תורים פנויים
+                            </p>
+                          </div>
+                          
+                          <p style="font-size:16px;color:#374151;line-height:1.5;margin-bottom:8px;">
+                            מקווים שמצאת את התור שחיפשת! 🎯
+                          </p>
+                          <p style="font-size:14px;color:#6B7280;line-height:1.5;">
+                            אם תרצה להירשם שוב בעתיד,<br>
+                            תמיד נשמח לעזור לך למצוא תור
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+                    
+                    <!-- Resubscribe Option -->
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:24px;">
+                      <tr>
+                        <td style="background-color:#F3F4F6;border-radius:6px;padding:20px;text-align:center;">
+                          <h3 style="font-size:16px;font-weight:600;color:#111827;margin-bottom:8px;">שינית דעתך?</h3>
+                          <p style="font-size:14px;color:#6B7280;margin-bottom:16px;">
+                            תוכל להירשם מחדש בכל עת
+                          </p>
+                          <a href="${resubscribeUrl}" 
+                             class="btn btn-primary"
+                             style="display:inline-block;background-color:#2563EB;color:#ffffff;padding:12px 32px;border-radius:6px;font-size:14px;font-weight:600;text-decoration:none;text-align:center;"
+                             role="button">
+                            🔄 הירשם מחדש
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                    
+                    <!-- Feedback -->
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                      <tr>
+                        <td align="center">
+                          <p style="font-size:14px;color:#6B7280;line-height:1.5;">
+                            יש לך הצעות לשיפור?<br>
+                            נשמח לשמוע ממך ב-<a href="mailto:support@tor-ramel.com" style="color:#2563EB;text-decoration:underline;">support@tor-ramel.com</a>
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+                    
+                  </td>
+                </tr>
+                
+                <!-- Footer -->
+                <tr>
+                  <td style="padding:20px 24px;border-top:1px solid #E5E7EB;background-color:#F9FAFB;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                      <tr>
+                        <td align="center">
+                          <p style="font-size:12px;color:#6B7280;line-height:1.5;margin-bottom:8px;">
+                            נשלח ל: ${userEmail}
+                          </p>
+                          <p style="font-size:12px;line-height:1.5;">
+                            <a href="${baseUrl}" style="color:#6B7280;text-decoration:underline;">אתר ראשי</a>
+                            <span style="color:#D1D5DB;margin:0 8px;">•</span>
+                            <a href="${baseUrl}/about" style="color:#6B7280;text-decoration:underline;">אודות</a>
+                          </p>
+                          <p style="font-size:12px;color:#6B7280;margin-top:8px;">
+                            תודה שהשתמשת ב-Tor-RamEl! ❤️
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                
+              </table>
+            </td>
+          </tr>
+        </table>
         
-        <div class="footer">
-          <div class="footer-text">
-            תודה שהשתמשת בשירות Tor-RamEl!
-          </div>
-        </div>
+        <!--[if mso]>
+        </td></tr></table>
+        <![endif]-->
+        
       </div>
     </body>
     </html>
   `;
 
   const text = `
-📵 הפסקת התראות Tor-RamEl
+ההתראות הופסקו - Tor-RamEl
+===========================
 
-ההתראות הופסקו בהצלחה
+👋 ההתראות הופסקו
 
-לא תקבל יותר התראות על תורים פנויים ברם-אל.
+ההרשמה שלך בוטלה בהצלחה
+לא נשלח לך יותר התראות על תורים פנויים
 
-💡 אם תרצה להירשם שוב בעתיד, תוכל לחזור לאתר ולהירשם מחדש בכל עת.
+מקווים שמצאת את התור שחיפשת! 🎯
 
-🏠 אתר ראשי: https://tor-ramel.netlify.app
-🔄 הירשם שוב: ${resubscribeUrl}
+אם תרצה להירשם שוב בעתיד,
+תמיד נשמח לעזור לך למצוא תור
 
-תודה שהשתמשת בשירות Tor-RamEl!
+שינית דעתך?
+-------------
+תוכל להירשם מחדש בכל עת:
+🔄 ${resubscribeUrl}
+
+יש לך הצעות לשיפור?
+נשמח לשמוע ממך ב-support@tor-ramel.com
+
+_______________
+נשלח ל: ${userEmail}
+
+אתר ראשי: ${baseUrl}
+
+תודה שהשתמשת ב-Tor-RamEl! ❤️
   `.trim();
 
   return { subject, html, text };
