@@ -65,13 +65,14 @@ const MAX_CACHE_SIZE = 100 // Prevent memory issues
 // Supabase client setup with enhanced error handling
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY, // Use service role key if available
   {
     db: {
       schema: 'public',
     },
     auth: {
-      persistSession: false
+      persistSession: false,
+      autoRefreshToken: false
     },
     global: {
       headers: {
