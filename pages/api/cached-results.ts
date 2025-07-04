@@ -26,89 +26,97 @@ export default async function handler(
       .single();
     
     if (newError) {
-      console.error('❌ Error fetching auto-check-minimal:', newError);
-    } else {
-      console.log('✅ Fetched auto-check-minimal cache:', {
-        hasData: !!newData,
-        hasValue: !!newData?.value,
-        updatedAt: newData?.updated_at
-      });
-    }
-    
-    let cacheData = null;
-    
-    if (!newError && newData?.value) {
-      cacheData = newData.value;
-      console.log('📊 Using auto-check-minimal cache:', {
-        found: cacheData.found,
-        count: cacheData.count,
-        previewLength: cacheData.preview?.length,
-        timestamp: new Date(cacheData.timestamp).toLocaleString('he-IL'),
-        firstAppointment: cacheData.preview?.[0]
-      });
-    } else {
+      console.error('❌ Error fetching new cache format:', newError);
+      
       // Fallback to old cache format
-      console.log('📦 Falling back to old cache format with key: auto-check');
+      console.log('📦 Trying fallback key: auto-check');
       const { data: oldData, error: oldError } = await supabase
         .from('cache')
-        .select('value, updated_at')
+        .select('value')
         .eq('key', 'auto-check')
         .single();
       
-      if (oldError) {
-        console.error('❌ Error fetching auto-check:', oldError);
-      } else {
-        console.log('✅ Fetched auto-check cache:', {
-          hasData: !!oldData,
-          hasValue: !!oldData?.value,
-          updatedAt: oldData?.updated_at
+      if (oldError || !oldData) {
+        console.error('❌ Both cache formats failed');
+        return res.status(200).json({ 
+          results: [], 
+          summary: { 
+            found: false, 
+            message: 'No cached data available',
+            hasAvailable: false
+          } 
         });
       }
-        
-      if (!oldError && oldData?.value) {
-        // Convert old format to new format
-        const oldValue = oldData.value;
-        if (oldValue.result?.results) {
-          const availableResults = oldValue.result.results.filter((r: any) => r.available === true);
-          cacheData = {
-            found: availableResults.length > 0,
-            preview: availableResults.slice(0, 5),
-            summary: oldValue.result.summary
-          };
-          console.log('📊 Converted old format cache:', {
-            found: cacheData.found,
-            previewLength: cacheData.preview?.length
-          });
-        }
-      }
-    }
       
-    if (!cacheData) {
-      console.log('❌ No cache data available');
-      const response = {
-        found: false,
-        preview: [],
-        summary: {
-          completedAt: new Date().toISOString(),
-          message: 'No cached data available'
-        }
-      };
-      return res.status(200).json(response);
+      return res.status(200).json(oldData.value);
     }
 
-    console.log('📤 Returning cache data:', {
+    const cacheData = newData.value;
+    console.log('✅ Cache data retrieved:', {
       found: cacheData.found,
-      previewCount: cacheData.preview?.length,
-      summary: cacheData.summary
+      count: cacheData.count,
+      preview: cacheData.preview?.length || 0,
+      timestamp: cacheData.timestamp,
+      updatedAt: newData.updated_at
     });
-
-    return res.status(200).json(cacheData);
-  } catch (error) {
-    console.error('❌ Failed to load cached results:', error);
+    
+    // Check if cache is stale (older than 10 minutes)
+    const cacheAge = Date.now() - cacheData.timestamp;
+    const isStale = cacheAge > 10 * 60 * 1000;
+    
+    if (isStale) {
+      console.warn('⚠️ Cache is stale (age:', Math.round(cacheAge / 1000), 'seconds)');
+    }
+    
+    // Extract appointments from preview
+    const appointments = cacheData.preview || [];
+    console.log(`📅 Found ${appointments.length} appointments in cache`);
+    
+    // Ensure appointments are sorted by date (nearest first)
+    appointments.sort((a: any, b: any) => a.date.localeCompare(b.date));
+    
+    // Get the nearest available appointment
+    const nearestAppointment = appointments.length > 0 ? appointments[0] : null;
+    
+    if (nearestAppointment) {
+      console.log(`🎯 Nearest appointment: ${nearestAppointment.date} with ${nearestAppointment.times?.length || 0} time slots`);
+    }
+    
+    // Format response to match expected structure
+    const response = {
+      results: appointments,
+      summary: {
+        found: cacheData.found,
+        count: cacheData.count || appointments.length,
+        hasAvailable: cacheData.found,
+        hasAvailableAppointments: cacheData.found,
+        totalChecked: cacheData.summary?.totalChecked || 0,
+        mode: cacheData.summary?.mode || '30_day_scan',
+        performance: cacheData.summary?.performance || {},
+        // Add nearest appointment info
+        nearestDate: nearestAppointment?.date,
+        nearestTimes: nearestAppointment?.times || [],
+        message: cacheData.found 
+          ? `נמצאו ${cacheData.count} תורים זמינים. הקרוב ביותר: ${nearestAppointment?.date}`
+          : 'לא נמצאו תורים זמינים ב-30 הימים הקרובים'
+      },
+      meta: {
+        cacheAge: Math.round(cacheAge / 1000),
+        isStale,
+        updatedAt: newData.updated_at
+      }
+    };
+    
+    console.log('📤 Sending response with nearest appointment:', nearestAppointment?.date);
+    
+    res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+    return res.status(200).json(response);
+    
+  } catch (error: any) {
+    console.error('❌ Unexpected error in cached-results:', error);
     return res.status(500).json({ 
-      error: 'Failed to load cached results',
-      found: false,
-      preview: []
+      error: 'Failed to fetch cached results',
+      details: error.message
     });
   }
 } 

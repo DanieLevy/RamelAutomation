@@ -1,13 +1,33 @@
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { motion } from 'framer-motion';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
-import { Calendar, Clock, ExternalLink, RefreshCw } from 'lucide-react';
+import { Calendar, Clock, ExternalLink, RefreshCw, Loader2, Search } from 'lucide-react';
 
 interface AppointmentResult {
   date: string;
   available: boolean;
   times: string[];
-  message: string;
+  message?: string;
+}
+
+interface CachedResult {
+  found?: boolean;
+  count?: number;
+  preview?: AppointmentResult[];
+  results?: AppointmentResult[];
+  summary?: {
+    found?: boolean;
+    hasAvailable?: boolean;
+    nearestDate?: string;
+    nearestTimes?: string[];
+    message?: string;
+  };
+  meta?: {
+    updatedAt?: string;
+    cacheAge?: number;
+  };
 }
 
 interface OpportunityBannerProps {
@@ -15,8 +35,9 @@ interface OpportunityBannerProps {
 }
 
 export default function OpportunityBanner({ onRefresh }: OpportunityBannerProps) {
-  const [cachedResult, setCachedResult] = useState<any>(null);
+  const [cachedResult, setCachedResult] = useState<CachedResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     loadCachedResults();
@@ -48,6 +69,24 @@ export default function OpportunityBanner({ onRefresh }: OpportunityBannerProps)
     }).format(date);
   };
 
+  const getDayNameHebrew = (dateStr: string): string => {
+    const date = new Date(dateStr + 'T00:00:00');
+    return new Intl.DateTimeFormat('he-IL', {
+      timeZone: 'Asia/Jerusalem',
+      weekday: 'long'
+    }).format(date);
+  };
+
+  const formatHebrewDate = (dateStr: string): string => {
+    const date = new Date(dateStr + 'T00:00:00');
+    return new Intl.DateTimeFormat('he-IL', {
+      timeZone: 'Asia/Jerusalem',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    }).format(date);
+  };
+
   const generateBookingUrl = (dateStr: string): string => {
     const baseUrl = 'https://mytor.co.il/home.php';
     const params = new URLSearchParams({
@@ -61,111 +100,149 @@ export default function OpportunityBanner({ onRefresh }: OpportunityBannerProps)
     return `${baseUrl}?${params.toString()}`;
   };
 
+  const refreshOpportunities = async () => {
+    setIsRefreshing(true);
+    console.log('🔄 Starting manual refresh...');
+    try {
+      const response = await fetch('/api/check-appointments', { 
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          mode: 'range',
+          days: 30
+        })
+      });
+      
+      const data = await response.json();
+      console.log('📊 Manual refresh response:', data);
+      
+      // Small delay to ensure cache is written
+      setTimeout(() => {
+        console.log('🔄 Reloading page...');
+        window.location.reload();
+      }, 500);
+    } catch (error) {
+      console.error('Failed to refresh:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   if (loading) {
     return (
-      <div className="bg-gradient-to-r from-primary/5 to-secondary/5 border border-primary/10 rounded-xl p-4 mb-4 animate-pulse">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-muted-foreground/20 rounded-full"></div>
-            <div className="space-y-2">
-              <div className="w-32 h-4 bg-muted-foreground/20 rounded"></div>
-              <div className="w-20 h-3 bg-muted-foreground/20 rounded"></div>
-            </div>
-          </div>
-          <div className="w-16 h-8 bg-muted-foreground/20 rounded"></div>
-        </div>
+      <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 mb-4 animate-pulse">
+        <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/2"></div>
       </div>
     );
   }
 
-  if (!cachedResult?.found || !cachedResult.preview?.length) {
-    console.log('OpportunityBanner: No appointments to show', {
-      found: cachedResult?.found,
-      previewLength: cachedResult?.preview?.length,
-      preview: cachedResult?.preview
-    });
+  if (!cachedResult) {
+    return null;
+  }
+
+  // Extract appointment data based on response structure
+  const appointments = cachedResult.results || cachedResult.preview || [];
+  const hasAppointments = cachedResult.found || cachedResult.summary?.hasAvailable || appointments.length > 0;
+  
+  if (!hasAppointments) {
     return (
-      <div className="bg-muted/30 border border-border/30 rounded-xl p-4 mb-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-muted-foreground/30 rounded-full flex items-center justify-center">
-              <Calendar className="w-4 h-4 text-muted-foreground" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">
-                אין תורים זמינים כרגע
-              </p>
-              <p className="text-xs text-muted-foreground/70">
-                עדכון אחרון: {cachedResult?.summary?.completedAt ? 
-                  new Date(cachedResult.summary.completedAt).toLocaleTimeString('he-IL') : 'לא ידוע'}
-              </p>
-            </div>
-          </div>
-          {onRefresh && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onRefresh}
-              className="h-8 px-3"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </Button>
-          )}
-        </div>
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
+        <p className="text-yellow-800">
+          לא נמצאו תורים זמינים ב-30 הימים הקרובים
+        </p>
       </div>
     );
   }
 
-  const nextAppointment = cachedResult.preview[0];
-  console.log('OpportunityBanner: Showing appointment', nextAppointment);
-
+  // Get the nearest appointment (first in sorted array)
+  const nearestAppointment = appointments[0];
+  const totalAvailable = cachedResult.count || appointments.length;
+  
   return (
-    <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 border border-green-200 dark:border-green-800/30 rounded-xl p-4 mb-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3 flex-1">
-          <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-            <Calendar className="w-4 h-4 text-white" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-medium text-green-800 dark:text-green-200 truncate">
-                {formatDisplayDateIsrael(nextAppointment.date)}
-              </p>
-              <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300">
-                {nextAppointment.times.length} תורים
-              </Badge>
-            </div>
-            <div className="flex items-center gap-1 mt-1">
-              <Clock className="w-3 h-3 text-green-600 dark:text-green-400" />
-              <p className="text-xs text-green-600 dark:text-green-400 truncate">
-                {nextAppointment.times.slice(0, 3).join(', ')}
-                {nextAppointment.times.length > 3 && ` +${nextAppointment.times.length - 3}`}
-              </p>
-            </div>
-          </div>
-        </div>
+    <motion.div
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="relative overflow-hidden bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg shadow-lg p-6 mb-6"
+    >
+      <div className="relative z-10">
+        <h2 className="text-2xl font-bold text-white mb-4 flex items-center">
+          <Calendar className="ml-2" size={28} />
+          תורים זמינים!
+        </h2>
         
-        <div className="flex items-center gap-2 ml-2">
-          {onRefresh && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onRefresh}
-              className="h-8 px-2 text-green-700 hover:text-green-800 dark:text-green-300"
+        {nearestAppointment && (
+          <div className="bg-white/20 backdrop-blur-sm rounded-lg p-4 mb-4">
+            <p className="text-white font-semibold text-lg mb-2">
+              התור הקרוב ביותר:
+            </p>
+            <div className="flex items-center gap-3 text-white">
+              <Calendar className="w-5 h-5" />
+              <span className="font-medium">
+                {getDayNameHebrew(nearestAppointment.date)}, {formatHebrewDate(nearestAppointment.date)}
+              </span>
+            </div>
+            {nearestAppointment.times && nearestAppointment.times.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {nearestAppointment.times.slice(0, 4).map((time: string) => (
+                  <span key={time} className="bg-white/30 px-3 py-1 rounded-full text-sm">
+                    {time}
+                  </span>
+                ))}
+                {nearestAppointment.times.length > 4 && (
+                  <span className="bg-white/30 px-3 py-1 rounded-full text-sm">
+                    +{nearestAppointment.times.length - 4}{' '}נוספים
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <p className="text-white/90 text-sm">
+              סה&quot;כ {totalAvailable} תורים זמינים ב-30 הימים הקרובים
+            </p>
+            {cachedResult.meta?.updatedAt && (
+              <p className="text-white/70 text-xs mt-1">
+                עודכן {new Date(cachedResult.meta.updatedAt).toLocaleTimeString('he-IL')}
+              </p>
+            )}
+          </div>
+          
+          <div className="flex gap-3 w-full sm:w-auto">
+            <button
+              onClick={refreshOpportunities}
+              disabled={isRefreshing}
+              className="flex-1 sm:flex-initial bg-white/20 hover:bg-white/30 text-white font-semibold py-2 px-4 rounded-full transition duration-300 flex items-center justify-center backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              title="רענן תורים זמינים"
             >
-              <RefreshCw className="w-4 h-4" />
-            </Button>
-          )}
-          <Button
-            size="sm"
-            onClick={() => window.open(generateBookingUrl(nextAppointment.date), '_blank')}
-            className="h-8 px-3 bg-green-600 hover:bg-green-700 text-white"
-          >
-            <ExternalLink className="w-3 h-3 mr-1" />
-            <span className="text-xs">קבע</span>
-          </Button>
+              {isRefreshing ? (
+                <>
+                  <Loader2 className="animate-spin ml-2" size={18} />
+                  מרענן...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="ml-2" size={18} />
+                  רענן
+                </>
+              )}
+            </button>
+            
+            <Link 
+              href="/manual-search" 
+              className="flex-1 sm:flex-initial bg-white text-blue-600 hover:bg-blue-50 font-semibold py-2 px-4 rounded-full transition duration-300 flex items-center justify-center"
+            >
+              <Search className="ml-2" size={18} />
+              חיפוש מתקדם
+            </Link>
+          </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 } 

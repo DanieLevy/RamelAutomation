@@ -370,15 +370,16 @@ async function findAppointmentsEnhanced() {
   const currentDate = getCurrentDateIsrael()
   console.log(`📅 Starting from date: ${formatDateIsrael(currentDate)}`)
   
-  const maxDays = 365 // Check up to a year ahead to find any available appointment
+  // CHANGED: Check only 30 days instead of 365
+  const maxDays = 30 // Check 30 days ahead as requested
   const openDates = getOpenDays(currentDate, maxDays)
   
-  console.log(`📊 Will check ${openDates.length} open dates (up to 1 year ahead) to find first available appointment`)
+  console.log(`📊 Will check ${openDates.length} open dates (30 days, excluding Monday/Saturday)`)
   console.log(`📊 First 5 dates to check: ${openDates.slice(0, 5).map(d => formatDateIsrael(d)).join(', ')}`)
   
   // INTELLIGENT CACHE CHECK: Look for recent cached results first
   const recentResults = []
-  for (const date of openDates.slice(0, 10)) { // Check first 10 dates
+  for (const date of openDates) { // Check ALL dates for cached results
     const dateStr = formatDateIsrael(date)
     const cached = responseCache.get(`apt_${dateStr}`)
     
@@ -390,40 +391,54 @@ async function findAppointmentsEnhanced() {
     }
   }
   
-  // If we have recent cached results, return them quickly
-  if (recentResults.length > 0) {
+  // If we have ALL dates cached with recent data, return them
+  if (recentResults.length === openDates.length) {
     const elapsed = Math.round((Date.now() - startTime) / 1000)
-    console.log(`🎯 CACHE HIT: Found ${recentResults.length} appointments in ${elapsed}s`)
-    console.log(`🎯 Cached appointments:`, JSON.stringify(recentResults, null, 2))
+    console.log(`🎯 FULL CACHE HIT: Found ${recentResults.length} dates from cache in ${elapsed}s`)
+    
+    // Sort by date to ensure nearest first
+    recentResults.sort((a, b) => a.date.localeCompare(b.date))
     
     return {
       success: true,
-      found: true,
-      appointments: recentResults,
+      found: recentResults.some(r => r.available),
+      appointments: recentResults.filter(r => r.available),
       summary: {
         totalChecked: recentResults.length,
         elapsed: elapsed,
-        mode: 'cache_hit',
-        hasAvailable: true,
+        mode: 'full_cache_hit',
+        hasAvailable: recentResults.some(r => r.available),
         completedAt: new Date().toISOString(),
         performance: performanceMetrics
       }
     }
   }
   
-  // ADAPTIVE BATCHING: Start with smaller batches, increase if performance is good
-  let BATCH_SIZE = 5
+  // ADAPTIVE BATCHING: Optimize for 30 days within 10 seconds
+  let BATCH_SIZE = 6 // Start with 6 parallel requests
   const results = []
-  let foundAny = false
+  let checkedDates = new Set(recentResults.map(r => r.date))
+  
+  // Add cached results first
+  results.push(...recentResults)
   
   for (let i = 0; i < openDates.length; i += BATCH_SIZE) {
     const batch = openDates.slice(i, i + BATCH_SIZE)
     const batchStartTime = Date.now()
     
-    console.log(`📦 Processing batch ${Math.floor(i/BATCH_SIZE) + 1}: ${batch.map(d => formatDateIsrael(d)).join(', ')}`)
+    // Filter out already cached dates
+    const datesToCheck = batch.filter(date => !checkedDates.has(formatDateIsrael(date)))
     
-    const batchPromises = batch.map(date => {
+    if (datesToCheck.length === 0) {
+      console.log(`📦 Batch ${Math.floor(i/BATCH_SIZE) + 1}: All dates cached, skipping`)
+      continue
+    }
+    
+    console.log(`📦 Processing batch ${Math.floor(i/BATCH_SIZE) + 1}: ${datesToCheck.map(d => formatDateIsrael(d)).join(', ')}`)
+    
+    const batchPromises = datesToCheck.map(date => {
       const dateStr = formatDateIsrael(date)
+      checkedDates.add(dateStr)
       return checkSingleDateWithRetry(dateStr)
     })
     
@@ -434,7 +449,6 @@ async function findAppointmentsEnhanced() {
       if (result.status === 'fulfilled') {
         results.push(result.value)
         if (result.value.available) {
-          foundAny = true
           console.log(`✅ Found available appointment on ${result.value.date}: ${result.value.times.length} slots [${result.value.times.join(', ')}]`)
         } else {
           console.log(`❌ No appointments on ${result.value.date}`)
@@ -442,7 +456,7 @@ async function findAppointmentsEnhanced() {
       } else {
         console.error(`🚨 Batch item failed:`, result.reason)
         results.push({
-          date: formatDateIsrael(batch[idx]),
+          date: formatDateIsrael(datesToCheck[idx]),
           available: null,
           times: [],
           error: result.reason?.message || 'Unknown error'
@@ -456,34 +470,32 @@ async function findAppointmentsEnhanced() {
     console.log(`📦 Batch ${Math.floor(i/BATCH_SIZE) + 1}: ${results.length}/${openDates.length} in ${batchTime}ms (total: ${elapsed}ms)`)
     
     // ADAPTIVE PERFORMANCE: Adjust batch size based on performance
-    if (batchTime < 500 && BATCH_SIZE < 8) {
-      BATCH_SIZE = Math.min(BATCH_SIZE + 1, 8)
+    if (batchTime < 600 && BATCH_SIZE < 10) {
+      BATCH_SIZE = Math.min(BATCH_SIZE + 2, 10)
       console.log(`⚡ Performance good, increasing batch size to ${BATCH_SIZE}`)
-    } else if (batchTime > 1500 && BATCH_SIZE > 3) {
-      BATCH_SIZE = Math.max(BATCH_SIZE - 1, 3)
+    } else if (batchTime > 1500 && BATCH_SIZE > 4) {
+      BATCH_SIZE = Math.max(BATCH_SIZE - 2, 4)
       console.log(`🐌 Performance slow, decreasing batch size to ${BATCH_SIZE}`)
     }
     
-    // INTELLIGENT EARLY EXIT
-    if (elapsed > 6500) { // 6.5 second safety limit
-      console.log(`⏰ TIME LIMIT: Stopping at ${elapsed}ms to avoid timeout`)
+    // STRICT TIME LIMIT: Stop at 9 seconds to leave buffer
+    if (elapsed > 9000) {
+      console.log(`⏰ TIME LIMIT: Stopping at ${elapsed}ms to stay under 10 seconds`)
       break
     }
     
-    // If we found any appointment, stop immediately (since we're looking for first available)
-    if (foundAny) {
-      console.log(`🎯 EARLY EXIT: Found first available appointment after checking ${results.length} dates in ${elapsed}ms`)
-      break
-    }
-    
-    // Smart delay between batches
-    if (i + BATCH_SIZE < openDates.length) {
-      const delay = Math.max(10, Math.min(50, batchTime / 10)) // Adaptive delay
+    // Smart delay between batches (reduced for 30 days)
+    if (i + BATCH_SIZE < openDates.length && datesToCheck.length > 0) {
+      const delay = Math.min(20, Math.max(10, batchTime / 20))
       await new Promise(resolve => setTimeout(resolve, delay))
     }
   }
   
   const elapsed = Math.round((Date.now() - startTime) / 1000)
+  
+  // Sort results by date to ensure nearest appointments first
+  results.sort((a, b) => a.date.localeCompare(b.date))
+  
   const availableResults = results.filter(r => r.available === true)
   const errorResults = results.filter(r => r.available === null)
   
@@ -491,9 +503,9 @@ async function findAppointmentsEnhanced() {
   console.log(`📊 Performance: ${performanceMetrics.cacheHits} cache hits, ${performanceMetrics.apiCalls} API calls, avg response: ${Math.round(performanceMetrics.totalResponseTime / Math.max(performanceMetrics.apiCalls, 1))}ms`)
   
   if (availableResults.length > 0) {
-    console.log(`🎯 Available appointments found:`, JSON.stringify(availableResults, null, 2))
+    console.log(`🎯 Available appointments found:`, JSON.stringify(availableResults.slice(0, 3), null, 2))
   } else {
-    console.log(`❌ No available appointments found after checking ${results.length} dates`)
+    console.log(`❌ No available appointments found in the next 30 days`)
   }
   
   return {
@@ -503,7 +515,7 @@ async function findAppointmentsEnhanced() {
     summary: {
       totalChecked: results.length,
       elapsed: elapsed,
-      mode: 'enhanced_parallel',
+      mode: '30_day_scan',
       hasAvailable: availableResults.length > 0,
       completedAt: new Date().toISOString(),
       performance: performanceMetrics,
