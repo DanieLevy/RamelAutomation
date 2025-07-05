@@ -1,10 +1,9 @@
 import { useRouter } from 'next/router';
 import Layout from '@/components/Layout';
 import OpportunityBanner from '@/components/OpportunityBanner';
-import SubscriptionManager from '@/components/SubscriptionManager';
 import UserOTPAuth from '@/components/UserOTPAuth';
 import { Button } from '@/components/ui/button';
-import { Search, Plus } from 'lucide-react';
+import { Search, Plus, Bell } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function Home() {
@@ -43,10 +42,6 @@ export default function Home() {
     setAuth(email, token);
   };
 
-  const handleDisconnect = () => {
-    clearAuth();
-  };
-
   return (
     <Layout title="תורים לרם-אל | בדיקת תורים פנויים" description="בדיקת תורים פנויים למספרת רם-אל">
       <div className="space-y-6">
@@ -81,24 +76,33 @@ export default function Home() {
               </div>
             </div>
           ) : (
-            // User connected - show subscription management
+            // User connected - show simple interface
             <div className="space-y-6">
-              {/* Subscription Manager */}
-              <SubscriptionManager 
-                userEmail={userEmail} 
-                onDisconnect={handleDisconnect}
-              />
+              {/* Welcome Message */}
+              <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 text-center">
+                <p className="text-sm text-muted-foreground mb-1">מחובר כ:</p>
+                <p className="font-medium">{userEmail}</p>
+                <Button
+                  onClick={clearAuth}
+                  variant="ghost"
+                  size="sm"
+                  className="mt-2 text-xs"
+                >
+                  התנתק
+                </Button>
+              </div>
               
               {/* Quick Actions for connected users */}
-              <div className="border-t border-border pt-6">
-                <h3 className="text-lg font-semibold mb-4 text-center">פעולות מהירות</h3>
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-center">פעולות מהירות</h3>
                 <div className="grid grid-cols-1 gap-3 max-w-xs mx-auto">
                   <Button
                     onClick={() => router.push('/notifications')}
-                    className="h-11 bg-primary hover:bg-primary/90 text-primary-foreground justify-start"
+                    className="h-12 bg-primary hover:bg-primary/90 text-primary-foreground justify-start"
+                    size="lg"
                   >
-                    <Plus className="w-4 h-4 ml-2" />
-                    הוסף התראה חדשה
+                    <Bell className="w-5 h-5 ml-2" />
+                    הרשמה להתראות
                   </Button>
                   
                   <Button
@@ -109,6 +113,13 @@ export default function Home() {
                     <Search className="w-4 h-4 ml-2" />
                     חיפוש ידני
                   </Button>
+                </div>
+                
+                {/* Info */}
+                <div className="bg-muted/30 rounded-lg p-4 max-w-sm mx-auto mt-6">
+                  <p className="text-sm text-muted-foreground text-center">
+                    המערכת תשלח לך מייל כשיימצאו תורים פנויים בתאריכים שבחרת
+                  </p>
                 </div>
               </div>
             </div>

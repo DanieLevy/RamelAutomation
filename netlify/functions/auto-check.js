@@ -530,18 +530,31 @@ async function updateExpiredSubscriptions() {
   const currentDateStr = formatDateIsrael(getCurrentDateIsrael())
   
   try {
-    // Fix JSON query syntax - use proper PostgreSQL JSON operators
-    const { error } = await supabase
-      .from('notifications')
+    // Update expired single day subscriptions
+    const { error: singleError } = await supabase
+      .from('notifications_simple')
       .update({ status: 'expired', updated_at: new Date().toISOString() })
       .eq('status', 'active')
-      .or(`criteria->>date.lt.${currentDateStr},criteria->>end.lt.${currentDateStr}`)
+      .eq('subscription_type', 'single')
+      .lt('target_date', currentDateStr)
     
-    if (error) {
-      console.error('Error updating expired subscriptions:', error)
-    } else {
-      console.log('Updated expired subscriptions')
+    if (singleError) {
+      console.error('Error updating expired single subscriptions:', singleError)
     }
+    
+    // Update expired range subscriptions
+    const { error: rangeError } = await supabase
+      .from('notifications_simple')
+      .update({ status: 'expired', updated_at: new Date().toISOString() })
+      .eq('status', 'active')
+      .eq('subscription_type', 'range')
+      .lt('date_end', currentDateStr)
+    
+    if (rangeError) {
+      console.error('Error updating expired range subscriptions:', rangeError)
+    }
+    
+    console.log('Updated expired subscriptions')
   } catch (error) {
     console.error('Failed to update expired subscriptions:', error)
   }
