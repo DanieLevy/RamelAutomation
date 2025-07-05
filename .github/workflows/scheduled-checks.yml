@@ -1,0 +1,46 @@
+name: Scheduled Appointment Checks
+
+on:
+  schedule:
+    # Run every 5 minutes
+    - cron: '*/5 * * * *'
+  workflow_dispatch: # Allow manual triggers
+
+jobs:
+  check-appointments:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Trigger Auto-Check Function
+        run: |
+          response=$(curl -s -w "\n%{http_code}" -X GET "https://tor-ramel.netlify.app/.netlify/functions/auto-check" \
+            -H "Accept: application/json" \
+            --fail \
+            --max-time 30)
+          
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+          
+          echo "HTTP Status: $http_code"
+          echo "Response Body: $body"
+          
+          if [ "$http_code" -ne 200 ]; then
+            echo "Function failed with status $http_code"
+            exit 1
+          fi
+          
+          # Parse JSON response and check for errors
+          if echo "$body" | grep -q '"success":\s*false'; then
+            echo "Function returned success: false"
+            exit 1
+          fi
+          
+          # Extract appointment count
+          count=$(echo "$body" | grep -o '"appointmentCount":\s*[0-9]*' | grep -o '[0-9]*' || echo "0")
+          echo "Found $count appointments"
+      
+      - name: Log Result
+        if: always()
+        run: |
+          echo "Check completed at $(date)"
+          echo "::notice title=Appointment Check::Auto-check completed successfully" 
