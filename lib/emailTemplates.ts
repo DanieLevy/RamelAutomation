@@ -4,6 +4,7 @@
 
 // Import template modules
 export { generateAppointmentNotificationEmail } from './emailTemplates/appointmentNotification';
+export { generateSubscriptionConfirmationEmail } from './emailTemplates/subscriptionConfirmation';
 
 // Common utilities used across templates
 export const formatHebrewDate = (dateStr: string): string => {

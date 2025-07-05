@@ -162,39 +162,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Send confirmation email (simple)
     try {
       const { emailService } = await import('@/lib/emailService');
+      const { generateSubscriptionConfirmationEmail } = await import('@/lib/emailTemplates/subscriptionConfirmation');
       
-      const emailContent = {
-        subject: 'אישור הרשמה להתראות - תורים לרם-אל',
-        html: `
-          <div style="direction: rtl; text-align: right; font-family: Arial, sans-serif;">
-            <h2>ההרשמה שלך התקבלה בהצלחה! ✅</h2>
-            <p>שלום,</p>
-            <p>נרשמת בהצלחה לקבלת התראות על תורים פנויים במספרת רם-אל.</p>
-            
-            <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
-              <h3>פרטי המינוי:</h3>
-              ${subscriptionType === 'single' 
-                ? `<p><strong>תאריך:</strong> ${new Date(targetDate).toLocaleDateString('he-IL')}</p>`
-                : `<p><strong>טווח תאריכים:</strong> ${new Date(dateStart).toLocaleDateString('he-IL')} - ${new Date(dateEnd).toLocaleDateString('he-IL')}</p>`
-              }
-            </div>
-            
-            <p>כאשר יימצאו תורים פנויים, נשלח לך מייל עם כל האפשרויות הזמינות.</p>
-            
-            <p style="margin-top: 30px;">
-              <a href="${process.env.NEXT_PUBLIC_BASE_URL}/unsubscribe?token=${newSubscription.stop_token}" 
-                 style="color: #666; text-decoration: underline;">
-                לביטול המינוי
-              </a>
-            </p>
-          </div>
-        `,
-        text: `ההרשמה שלך התקבלה בהצלחה!\n\nפרטי המינוי:\n${
-          subscriptionType === 'single' 
-            ? `תאריך: ${new Date(targetDate).toLocaleDateString('he-IL')}`
-            : `טווח תאריכים: ${new Date(dateStart).toLocaleDateString('he-IL')} - ${new Date(dateEnd).toLocaleDateString('he-IL')}`
-        }\n\nכאשר יימצאו תורים פנויים, נשלח לך מייל עם כל האפשרויות הזמינות.`
-      };
+      // Generate email content using the new template
+      const emailContent = generateSubscriptionConfirmationEmail({
+        subscription: {
+          id: newSubscription.id,
+          type: subscriptionType,
+          targetDate: subscriptionType === 'single' ? targetDate : undefined,
+          dateStart: subscriptionType === 'range' ? dateStart : undefined,
+          dateEnd: subscriptionType === 'range' ? dateEnd : undefined,
+          email: email,
+          stopToken: newSubscription.stop_token
+        },
+        baseUrl: process.env.NEXT_PUBLIC_BASE_URL || ''
+      });
 
       await emailService.queueEmail({
         to: email,
@@ -203,6 +185,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         text: emailContent.text,
         priority: 5
       });
+      
+      console.log(`📧 Confirmation email queued for ${email}`);
     } catch (emailError) {
       console.error('Failed to queue confirmation email:', emailError);
       // Don't fail the request if email fails
