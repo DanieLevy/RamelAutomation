@@ -44,15 +44,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'יש לבחור תאריך' });
       }
       
-      // Check if date is not in the past
-      const selectedDate = new Date(targetDate + 'T00:00:00');
+      // Parse date in local timezone
+      const [year, month, day] = targetDate.split('-').map(Number);
+      const selectedDate = new Date(year, month - 1, day); // month is 0-indexed
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
       console.log('Date validation:', {
         targetDate,
         selectedDate: selectedDate.toISOString(),
+        selectedDateLocal: selectedDate.toLocaleDateString('he-IL'),
         today: today.toISOString(),
+        todayLocal: today.toLocaleDateString('he-IL'),
         isPast: selectedDate < today
       });
       
@@ -64,8 +67,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'יש לבחור טווח תאריכים' });
       }
       
-      const startDate = new Date(dateStart + 'T00:00:00');
-      const endDate = new Date(dateEnd + 'T00:00:00');
+      // Parse dates in local timezone
+      const [startYear, startMonth, startDay] = dateStart.split('-').map(Number);
+      const [endYear, endMonth, endDay] = dateEnd.split('-').map(Number);
+      const startDate = new Date(startYear, startMonth - 1, startDay);
+      const endDate = new Date(endYear, endMonth - 1, endDay);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
@@ -73,8 +79,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         dateStart,
         dateEnd,
         startDate: startDate.toISOString(),
+        startDateLocal: startDate.toLocaleDateString('he-IL'),
         endDate: endDate.toISOString(),
+        endDateLocal: endDate.toLocaleDateString('he-IL'),
         today: today.toISOString(),
+        todayLocal: today.toLocaleDateString('he-IL'),
         startIsPast: startDate < today,
         endBeforeStart: endDate < startDate
       });
@@ -108,11 +117,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ error: 'שגיאה בבדיקת מינויים קיימים' });
     }
 
+    console.log('Existing subscriptions:', existingSubscriptions);
+
     // Check for overlapping subscriptions
     if (existingSubscriptions && existingSubscriptions.length > 0) {
       for (const sub of existingSubscriptions) {
+        console.log('Checking overlap with subscription:', sub);
+        
         if (subscriptionType === 'single' && sub.subscription_type === 'single') {
           if (sub.target_date === targetDate) {
+            console.log('Found duplicate single date subscription');
             return res.status(400).json({ 
               error: 'כבר קיים מינוי פעיל לתאריך זה' 
             });
@@ -124,7 +138,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const newStart = dateStart || targetDate;
           const newEnd = dateEnd || targetDate;
           
+          console.log('Checking date overlap:', {
+            existing: { start: subStart, end: subEnd },
+            new: { start: newStart, end: newEnd }
+          });
+          
           if (!(newEnd < subStart || newStart > subEnd)) {
+            console.log('Found overlapping date range');
             return res.status(400).json({ 
               error: 'קיים מינוי פעיל עם תאריכים חופפים' 
             });
