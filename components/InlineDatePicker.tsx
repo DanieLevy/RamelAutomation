@@ -3,29 +3,59 @@ import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { Button } from './ui/button';
 
 interface InlineDatePickerProps {
+  // Legacy props (for backwards compatibility)
   value?: Date;
-  onChange: (date: Date) => void;
-  mode?: 'single' | 'range';
+  onChange?: (date: Date) => void;
   startDate?: Date;
   endDate?: Date;
   onRangeChange?: (start: Date, end: Date) => void;
+  
+  // New props
+  mode?: 'single' | 'range';
+  onDateSelect?: (date: Date | null) => void;
+  onRangeSelect?: (start: Date, end: Date) => void;
+  selectedDate?: Date | null;
+  selectedRange?: { from: Date | null; to: Date | null };
+  disablePast?: boolean;
+  disableDays?: string[]; // Array of day names to disable (e.g., ['Monday', 'Saturday'])
+  maxRange?: number; // Maximum number of days for range selection
   className?: string;
 }
 
 export default function InlineDatePicker({ 
+  // Legacy props
   value, 
-  onChange, 
-  mode = 'single',
+  onChange,
   startDate,
   endDate,
   onRangeChange,
+  
+  // New props
+  mode = 'single',
+  onDateSelect,
+  onRangeSelect,
+  selectedDate,
+  selectedRange,
+  disablePast = false,
+  disableDays = [],
+  maxRange,
   className = ''
 }: InlineDatePickerProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedRange, setSelectedRange] = useState<{ start: Date | null, end: Date | null }>({
-    start: startDate || null,
-    end: endDate || null
+  const [internalSelectedRange, setInternalSelectedRange] = useState<{ start: Date | null, end: Date | null }>({
+    start: selectedRange?.from || startDate || null,
+    end: selectedRange?.to || endDate || null
   });
+
+  // Update internal range when props change
+  useEffect(() => {
+    if (selectedRange) {
+      setInternalSelectedRange({
+        start: selectedRange.from,
+        end: selectedRange.to
+      });
+    }
+  }, [selectedRange]);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -36,6 +66,7 @@ export default function InlineDatePicker({
   ];
 
   const dayNames = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];
+  const englishDayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
@@ -60,24 +91,68 @@ export default function InlineDatePicker({
     return days;
   };
 
+  const isDateDisabled = (date: Date) => {
+    // Check if date is in the past
+    if (disablePast && date < today) {
+      return true;
+    }
+    
+    // Check if day of week is disabled
+    if (disableDays.length > 0) {
+      const dayName = englishDayNames[date.getDay()];
+      if (disableDays.includes(dayName)) {
+        return true;
+      }
+    }
+    
+    return false;
+  };
+
   const handleDateClick = (date: Date) => {
+    if (isDateDisabled(date)) return;
+
     if (mode === 'single') {
-      onChange(date);
+      // Use new callback if available, otherwise fallback to legacy
+      if (onDateSelect) {
+        onDateSelect(date);
+      } else if (onChange) {
+        onChange(date);
+      }
     } else {
       // Range mode
-      if (!selectedRange.start || (selectedRange.start && selectedRange.end)) {
+      if (!internalSelectedRange.start || (internalSelectedRange.start && internalSelectedRange.end)) {
         // Start new range
-        setSelectedRange({ start: date, end: null });
-      } else if (selectedRange.start && !selectedRange.end) {
+        setInternalSelectedRange({ start: date, end: null });
+      } else if (internalSelectedRange.start && !internalSelectedRange.end) {
         // Complete range
-        const start = selectedRange.start;
+        const start = internalSelectedRange.start;
         const end = date;
+        
+        // Check max range if specified
+        if (maxRange) {
+          const daysDiff = Math.ceil(Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+          if (daysDiff > maxRange) {
+            // Reset selection if exceeds max range
+            setInternalSelectedRange({ start: date, end: null });
+            return;
+          }
+        }
+        
         if (start <= end) {
-          setSelectedRange({ start, end });
-          onRangeChange?.(start, end);
+          setInternalSelectedRange({ start, end });
+          // Use new callback if available, otherwise fallback to legacy
+          if (onRangeSelect) {
+            onRangeSelect(start, end);
+          } else if (onRangeChange) {
+            onRangeChange(start, end);
+          }
         } else {
-          setSelectedRange({ start: end, end: start });
-          onRangeChange?.(end, start);
+          setInternalSelectedRange({ start: end, end: start });
+          if (onRangeSelect) {
+            onRangeSelect(end, start);
+          } else if (onRangeChange) {
+            onRangeChange(end, start);
+          }
         }
       }
     }
@@ -85,34 +160,31 @@ export default function InlineDatePicker({
 
   const isDateSelected = (date: Date) => {
     if (mode === 'single') {
-      return value && date.toDateString() === value.toDateString();
+      const compareDate = selectedDate || value;
+      return compareDate && date.toDateString() === compareDate.toDateString();
     } else {
-      if (!selectedRange.start) return false;
-      if (selectedRange.start && !selectedRange.end) {
-        return date.toDateString() === selectedRange.start.toDateString();
+      if (!internalSelectedRange.start) return false;
+      if (internalSelectedRange.start && !internalSelectedRange.end) {
+        return date.toDateString() === internalSelectedRange.start.toDateString();
       }
-      if (selectedRange.start && selectedRange.end) {
-        return date >= selectedRange.start && date <= selectedRange.end;
+      if (internalSelectedRange.start && internalSelectedRange.end) {
+        return date >= internalSelectedRange.start && date <= internalSelectedRange.end;
       }
     }
     return false;
   };
 
   const isDateInRange = (date: Date) => {
-    if (mode !== 'range' || !selectedRange.start || !selectedRange.end) return false;
-    return date > selectedRange.start && date < selectedRange.end;
+    if (mode !== 'range' || !internalSelectedRange.start || !internalSelectedRange.end) return false;
+    return date > internalSelectedRange.start && date < internalSelectedRange.end;
   };
 
   const isDateRangeStart = (date: Date) => {
-    return mode === 'range' && selectedRange.start && date.toDateString() === selectedRange.start.toDateString();
+    return mode === 'range' && internalSelectedRange.start && date.toDateString() === internalSelectedRange.start.toDateString();
   };
 
   const isDateRangeEnd = (date: Date) => {
-    return mode === 'range' && selectedRange.end && date.toDateString() === selectedRange.end.toDateString();
-  };
-
-  const isPastDate = (date: Date) => {
-    return date < today;
+    return mode === 'range' && internalSelectedRange.end && date.toDateString() === internalSelectedRange.end.toDateString();
   };
 
   const nextMonth = () => {
@@ -175,17 +247,17 @@ export default function InlineDatePicker({
           const inRange = isDateInRange(date);
           const rangeStart = isDateRangeStart(date);
           const rangeEnd = isDateRangeEnd(date);
-          const past = isPastDate(date);
+          const disabled = isDateDisabled(date);
 
           return (
             <button
               key={index}
-              onClick={() => !past && handleDateClick(date)}
-              disabled={past}
+              onClick={() => !disabled && handleDateClick(date)}
+              disabled={disabled}
               className={`
                 h-8 text-xs font-medium rounded-md transition-colors relative
-                ${past 
-                  ? 'text-muted-foreground/50 cursor-not-allowed' 
+                ${disabled 
+                  ? 'text-muted-foreground/50 cursor-not-allowed line-through' 
                   : 'hover:bg-muted/60 cursor-pointer'
                 }
                 ${selected && mode === 'single' 
@@ -212,18 +284,21 @@ export default function InlineDatePicker({
       </div>
 
       {/* Range info */}
-      {mode === 'range' && selectedRange.start && (
+      {mode === 'range' && internalSelectedRange.start && (
         <div className="mt-4 pt-4 border-t border-border">
           <div className="text-xs text-muted-foreground text-center">
-            {selectedRange.end ? (
+            {internalSelectedRange.end ? (
               <>
-                נבחר: {selectedRange.start.toLocaleDateString('he-IL')} - {selectedRange.end.toLocaleDateString('he-IL')}
+                נבחר: {internalSelectedRange.start.toLocaleDateString('he-IL')} - {internalSelectedRange.end.toLocaleDateString('he-IL')}
                 <div className="text-[10px] mt-1">
-                  {Math.ceil((selectedRange.end.getTime() - selectedRange.start.getTime()) / (1000 * 60 * 60 * 24)) + 1} ימים
+                  {Math.ceil((internalSelectedRange.end.getTime() - internalSelectedRange.start.getTime()) / (1000 * 60 * 60 * 24)) + 1} ימים
                 </div>
               </>
             ) : (
-              <>בחר תאריך סיום</>
+              <>
+                בחר תאריך סיום
+                {maxRange && <div className="text-[10px] mt-1">(מקסימום {maxRange} ימים)</div>}
+              </>
             )}
           </div>
         </div>

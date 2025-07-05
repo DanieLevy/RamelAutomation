@@ -1,4 +1,21 @@
-// Utility functions
+// =================================================================================
+// APPOINTMENT NOTIFICATION EMAIL TEMPLATE - SIMPLIFIED VERSION
+// =================================================================================
+
+interface AppointmentData {
+  date: string;
+  available: boolean;
+  times: string[];
+}
+
+interface EmailOptions {
+  appointments: AppointmentData[];
+  notificationId: string;
+  actionToken: string;
+  baseUrl: string;
+}
+
+// Helper functions
 const formatHebrewDate = (dateStr: string): string => {
   const hebrewMonths = [
     'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
@@ -8,8 +25,9 @@ const formatHebrewDate = (dateStr: string): string => {
   const date = new Date(dateStr + 'T00:00:00');
   const day = date.getDate();
   const month = hebrewMonths[date.getMonth()];
+  const year = date.getFullYear();
   
-  return `${day} ב${month}`;
+  return `${day} ב${month} ${year}`;
 };
 
 const getDayNameHebrew = (dateStr: string): string => {
@@ -21,341 +39,290 @@ const getDayNameHebrew = (dateStr: string): string => {
   return hebrewDayNames[date.getDay()];
 };
 
-// Modern minimal appointment notification email template
-export const generateAppointmentNotificationEmail = (
-  matchingResults: Array<{date: string, times: string[]}>,
-  responseTokens: {[key: string]: string} | null,
-  currentPhase: number,
-  maxPhases: number,
-  subscriberEmail: string,
-  unsubscribeToken: string
-): { html: string; subject: string; text: string } => {
-  
-  // Count total appointments
-  const totalAppointments = matchingResults.reduce((sum, result) => sum + result.times.length, 0);
-  const totalDays = matchingResults.length;
-  const isUrgent = matchingResults.some(result => {
-    const appointmentDate = new Date(result.date + 'T00:00:00');
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return appointmentDate.getTime() === today.getTime();
+const generateBookingUrl = (dateStr: string): string => {
+  const baseUrl = 'https://mytor.co.il/home.php';
+  const params = new URLSearchParams({
+    i: 'cmFtZWwzMw==',  // ramel33 encoded
+    s: 'MjY1',         // 265
+    mm: 'y',
+    lang: 'he',
+    datef: dateStr,
+    signup: 'הצג'      // Hebrew for "Show"
   });
   
-  // Generate modern subject with urgency indicator
-  const urgencyEmoji = isUrgent ? '⚡ ' : '';
-  const phaseIndicator = maxPhases > 1 ? ` (${currentPhase}/${maxPhases})` : '';
-  const subject = `${urgencyEmoji}נמצאו ${totalAppointments} תורים פנויים${phaseIndicator} - Tor-RamEl`;
-  
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app';
-  
-  const html = `
-    <!DOCTYPE html>
-    <html dir="rtl" lang="he">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <meta name="color-scheme" content="light">
-      <meta name="supported-color-schemes" content="light">
-      <title>תורים פנויים - Tor-RamEl</title>
-      <!--[if mso]>
-      <noscript>
-        <xml>
-          <o:OfficeDocumentSettings>
-            <o:PixelsPerInch>96</o:PixelsPerInch>
-          </o:OfficeDocumentSettings>
-        </xml>
-      </noscript>
-      <![endif]-->
-      <style type="text/css">
-        /* CSS Reset */
-        body, table, td, div, p, a { 
-          -webkit-text-size-adjust: 100%; 
-          -ms-text-size-adjust: 100%; 
-        }
-        table, td { 
-          mso-table-lspace: 0pt; 
-          mso-table-rspace: 0pt; 
-        }
-        img { 
-          -ms-interpolation-mode: bicubic; 
-          border: 0; 
-          outline: none; 
-          text-decoration: none; 
-        }
-        
-        /* Base Styles */
-        body {
-          margin: 0 !important;
-          padding: 0 !important;
-          min-width: 100% !important;
-          background-color: #f3f4f6;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
-          direction: rtl;
-        }
-        
-        /* Typography */
-        h1, h2, h3, p {
-          margin: 0;
-          padding: 0;
-        }
-        
-        /* Links */
-        a {
-          color: #2563EB;
-          text-decoration: none;
-        }
-        
-        /* Hover Effects - Progressive Enhancement */
-        @media (hover: hover) {
-          .btn-primary:hover {
-            background-color: #1D4ED8 !important;
-          }
-          .btn-secondary:hover {
-            background-color: #E5E7EB !important;
-          }
-          .appointment-card:hover {
-            border-color: #2563EB !important;
-          }
-        }
-        
-        /* Mobile Responsive */
-        @media only screen and (max-width: 600px) {
-          .container {
-            width: 100% !important;
-            max-width: 100% !important;
-          }
-          .content-section {
-            padding: 16px !important;
-          }
-          .appointment-card {
-            padding: 12px !important;
-          }
-          .btn {
-            display: block !important;
-            width: 100% !important;
-            margin-bottom: 8px !important;
-          }
-          .btn-wrapper {
-            display: block !important;
-            width: 100% !important;
-            text-align: center !important;
-          }
-          .phase-indicator {
-            font-size: 11px !important;
-          }
-        }
-        
-        /* Dark Mode Support */
-        @media (prefers-color-scheme: dark) {
-          /* Keep light theme for better email client support */
-        }
-      </style>
-    </head>
-    <body style="margin:0;padding:0;word-spacing:normal;background-color:#f3f4f6;">
-      <div role="article" aria-roledescription="email" lang="he" dir="rtl" style="text-size-adjust:100%;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
-        
-        <!--[if mso]>
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-        <tr><td align="center">
-        <![endif]-->
-        
-        <!-- Preheader Text -->
-        <div style="display:none;font-size:1px;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;mso-hide:all;">
-          ${isUrgent ? '⚡ דחוף! ' : ''}נמצאו ${totalAppointments} תורים פנויים${totalDays > 1 ? ` ב-${totalDays} ימים` : ''} - בדוק עכשיו!
-        </div>
-        
-        <!-- Main Container -->
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto;padding:20px 0;width:100%;max-width:600px;">
-          <tr>
-            <td>
-              <!-- Email Container -->
-              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-                
-                <!-- Header -->
-                <tr>
-                  <td style="padding:20px 24px;border-bottom:1px solid #E5E7EB;">
-                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-                      <tr>
-                        <td align="right" style="vertical-align:middle;">
-                          <span style="font-size:20px;font-weight:600;color:#111827;">🎯 Tor-RamEl</span>
-                        </td>
-                        ${currentPhase > 1 ? `
-                        <td align="left" style="vertical-align:middle;">
-                          <span class="phase-indicator" style="background-color:#EFF6FF;color:#2563EB;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:500;">
-                            התראה ${currentPhase}/${maxPhases}
-                          </span>
-                        </td>
-                        ` : ''}
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-                
-                <!-- Main Content -->
-                <tr>
-                  <td class="content-section" style="padding:32px 24px;">
-                    
-                    <!-- Success Message -->
-                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:24px;">
-                      <tr>
-                        <td align="center">
-                          ${isUrgent ? '<p style="font-size:14px;color:#F59E0B;font-weight:600;margin-bottom:8px;">⚡ תורים דחופים להיום!</p>' : ''}
-                          <h1 style="font-size:24px;font-weight:600;color:#111827;line-height:1.25;margin-bottom:8px;">
-                            מצאנו ${totalAppointments} ${totalAppointments === 1 ? 'תור פנוי' : 'תורים פנויים'}!
-                          </h1>
-                          <p style="font-size:16px;color:#6B7280;line-height:1.5;">
-                            ${totalDays > 1 ? `ב-${totalDays} ימים שונים ` : ''}ברם-אל מחכים לך
-                          </p>
-                        </td>
-                      </tr>
-                    </table>
-                    
-                    <!-- Appointments List -->
-                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:24px;">
-                      ${matchingResults.map(appointment => {
-                        const isToday = new Date(appointment.date + 'T00:00:00').toDateString() === new Date().toDateString();
-                        return `
-                        <tr>
-                          <td style="padding-bottom:12px;">
-                            <div class="appointment-card" style="background-color:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:16px;${isToday ? 'border-color:#F59E0B;' : ''}">
-                              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-                                <tr>
-                                  <td>
-                                    <p style="font-size:16px;font-weight:600;color:#111827;margin-bottom:8px;">
-                                      ${isToday ? '⚡ ' : '📅 '}${getDayNameHebrew(appointment.date)}, ${formatHebrewDate(appointment.date)}
-                                    </p>
-                                  </td>
-                                </tr>
-                                <tr>
-                                  <td>
-                                    <div style="margin-top:8px;">
-                                      ${appointment.times.map(time => `
-                                        <span style="display:inline-block;background-color:#2563EB;color:#ffffff;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:500;margin:2px;">
-                                          ${time}
-                                        </span>
-                                      `).join('')}
-                                    </div>
-                                  </td>
-                                </tr>
-                              </table>
-                            </div>
-                          </td>
-                        </tr>
-                        `;
-                      }).join('')}
-                    </table>
-                    
-                    <!-- Action Section -->
-                    ${responseTokens && Object.keys(responseTokens).length > 0 ? `
-                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:16px;">
-                      <tr>
-                        <td style="background-color:#EFF6FF;border-radius:6px;padding:20px;text-align:center;">
-                          <p style="font-size:16px;font-weight:600;color:#1E40AF;margin-bottom:12px;">
-                            האם אחד התורים מתאים לך?
-                          </p>
-                          <p style="font-size:14px;color:#3730A3;margin-bottom:16px;line-height:1.5;">
-                            לחץ "מצאתי!" אם תפסת תור<br>
-                            או "לא מתאים" ונמשיך לחפש
-                          </p>
-                          <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center">
-                            <tr>
-                              <td class="btn-wrapper" style="padding-left:8px;">
-                                <a href="${baseUrl}/appointment-response?token=${Object.values(responseTokens)[0]}&action=taken" 
-                                   class="btn btn-primary"
-                                   style="display:inline-block;background-color:#10B981;color:#ffffff;padding:12px 32px;border-radius:6px;font-size:14px;font-weight:600;text-decoration:none;text-align:center;"
-                                   role="button"
-                                   aria-label="מצאתי תור מתאים">
-                                  ✓ מצאתי!
-                                </a>
-                              </td>
-                              <td class="btn-wrapper">
-                                <a href="${baseUrl}/appointment-response?token=${Object.values(responseTokens)[0]}&action=not_wanted" 
-                                   class="btn btn-secondary"
-                                   style="display:inline-block;background-color:#F3F4F6;color:#374151;padding:12px 24px;border-radius:6px;font-size:14px;font-weight:500;text-decoration:none;text-align:center;border:1px solid #D1D5DB;"
-                                   role="button"
-                                   aria-label="התורים לא מתאימים">
-                                  לא מתאים
-                                </a>
-                              </td>
-                            </tr>
-                          </table>
-                        </td>
-                      </tr>
-                    </table>
-                    ` : ''}
-                    
-                  </td>
-                </tr>
-                
-                <!-- Footer -->
-                <tr>
-                  <td style="padding:20px 24px;border-top:1px solid #E5E7EB;background-color:#F9FAFB;">
-                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-                      <tr>
-                        <td align="center">
-                          <p style="font-size:12px;color:#6B7280;line-height:1.5;margin-bottom:8px;">
-                            נשלח ל: ${subscriberEmail}
-                          </p>
-                          <p style="font-size:12px;line-height:1.5;">
-                            <a href="${baseUrl}/unsubscribe?token=${unsubscribeToken}" style="color:#6B7280;text-decoration:underline;">הפסק לקבל התראות</a>
-                            <span style="color:#D1D5DB;margin:0 8px;">•</span>
-                            <a href="${baseUrl}/manage?email=${encodeURIComponent(subscriberEmail)}" style="color:#6B7280;text-decoration:underline;">נהל הגדרות</a>
-                            <span style="color:#D1D5DB;margin:0 8px;">•</span>
-                            <a href="${baseUrl}" style="color:#6B7280;text-decoration:underline;">אתר ראשי</a>
-                          </p>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-                
-              </table>
-            </td>
-          </tr>
-        </table>
-        
-        <!--[if mso]>
-        </td></tr></table>
-        <![endif]-->
-        
-      </div>
-    </body>
-    </html>
-  `;
+  return `${baseUrl}?${params.toString()}`;
+};
 
-  // Plain text version
+export function generateAppointmentNotificationEmail(options: EmailOptions): { subject: string; html: string; text: string } {
+  const { appointments, notificationId, actionToken, baseUrl } = options;
+  
+  // Sort appointments by date
+  const sortedAppointments = [...appointments].sort((a, b) => a.date.localeCompare(b.date));
+  
+  // Generate subject with count
+  const totalSlots = sortedAppointments.reduce((sum, apt) => sum + apt.times.length, 0);
+  const subject = `🎯 נמצאו ${totalSlots} תורים פנויים במספרת רם-אל!`;
+  
+  // Generate HTML content
+  const html = `
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      background-color: #f5f5f5;
+      color: #333;
+      line-height: 1.6;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .email-content {
+      background-color: #ffffff;
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .header h1 {
+      color: #2563eb;
+      font-size: 28px;
+      margin: 0 0 10px 0;
+    }
+    .header p {
+      color: #64748b;
+      font-size: 16px;
+      margin: 0;
+    }
+    .appointments-list {
+      margin: 30px 0;
+    }
+    .appointment-card {
+      background-color: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 15px;
+    }
+    .appointment-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    .appointment-date {
+      font-size: 18px;
+      font-weight: 600;
+      color: #1e293b;
+    }
+    .appointment-day {
+      font-size: 14px;
+      color: #64748b;
+    }
+    .appointment-times {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    .time-slot {
+      background-color: #e0f2fe;
+      color: #0369a1;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: 500;
+      font-size: 14px;
+    }
+    .book-button {
+      display: inline-block;
+      background-color: #2563eb;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 14px;
+      transition: background-color 0.2s;
+    }
+    .book-button:hover {
+      background-color: #1d4ed8;
+    }
+    .action-section {
+      background-color: #fef3c7;
+      border: 1px solid #fcd34d;
+      border-radius: 8px;
+      padding: 25px;
+      margin: 30px 0;
+      text-align: center;
+    }
+    .action-section h2 {
+      color: #92400e;
+      font-size: 20px;
+      margin: 0 0 15px 0;
+    }
+    .action-section p {
+      color: #78350f;
+      margin: 0 0 20px 0;
+      font-size: 14px;
+    }
+    .action-buttons {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .action-button {
+      display: inline-block;
+      padding: 12px 24px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 16px;
+      transition: all 0.2s;
+    }
+    .continue-button {
+      background-color: #10b981;
+      color: white;
+    }
+    .continue-button:hover {
+      background-color: #059669;
+    }
+    .stop-button {
+      background-color: #ef4444;
+      color: white;
+    }
+    .stop-button:hover {
+      background-color: #dc2626;
+    }
+    .footer {
+      text-align: center;
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #e2e8f0;
+      color: #64748b;
+      font-size: 12px;
+    }
+    .footer a {
+      color: #64748b;
+      text-decoration: underline;
+    }
+    @media (max-width: 600px) {
+      .container {
+        padding: 10px;
+      }
+      .email-content {
+        padding: 20px;
+      }
+      .appointment-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .action-buttons {
+        flex-direction: column;
+        width: 100%;
+      }
+      .action-button {
+        width: 100%;
+        text-align: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="email-content">
+      <div class="header">
+        <h1>🎉 נמצאו תורים פנויים!</h1>
+        <p>מצאנו ${totalSlots} תורים זמינים במספרת רם-אל</p>
+      </div>
+      
+      <div class="appointments-list">
+        ${sortedAppointments.map(appointment => `
+          <div class="appointment-card">
+            <div class="appointment-header">
+              <div>
+                <div class="appointment-date">${formatHebrewDate(appointment.date)}</div>
+                <div class="appointment-day">יום ${getDayNameHebrew(appointment.date)}</div>
+              </div>
+            </div>
+            <div class="appointment-times">
+              ${appointment.times.map(time => `
+                <span class="time-slot">${time}</span>
+              `).join('')}
+            </div>
+            <a href="${generateBookingUrl(appointment.date)}" class="book-button" target="_blank">
+              🚀 קבע תור לתאריך זה
+            </a>
+          </div>
+        `).join('')}
+      </div>
+      
+      <div class="action-section">
+        <h2>📌 מצאת תור מתאים?</h2>
+        <p>אנא בחר אחת מהאפשרויות הבאות:</p>
+        <div class="action-buttons">
+          <a href="${baseUrl}/api/notification-action?token=${actionToken}&action=continue" 
+             class="action-button continue-button">
+            ✅ המשך לחפש
+          </a>
+          <a href="${baseUrl}/api/notification-action?token=${actionToken}&action=stop" 
+             class="action-button stop-button">
+            🛑 מצאתי תור, עצור התראות
+          </a>
+        </div>
+      </div>
+      
+      <div class="footer">
+        <p>
+          אם אינך רואה את הכפתורים, העתק את הקישורים הבאים:
+        </p>
+        <p style="direction: ltr; text-align: left; font-size: 11px;">
+          המשך חיפוש: ${baseUrl}/api/notification-action?token=${actionToken}&action=continue<br>
+          עצור התראות: ${baseUrl}/api/notification-action?token=${actionToken}&action=stop
+        </p>
+        <p style="margin-top: 20px;">
+          מערכת התראות אוטומטית למספרת רם-אל
+        </p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+  
+  // Generate plain text version
   const text = `
-Tor-RamEl - תורים פנויים${isUrgent ? ' ⚡ דחוף!' : ''}
+נמצאו תורים פנויים במספרת רם-אל!
 =====================================
 
-${isUrgent ? '⚡ תורים דחופים להיום!\n\n' : ''}מצאנו ${totalAppointments} ${totalAppointments === 1 ? 'תור פנוי' : 'תורים פנויים'}${totalDays > 1 ? ` ב-${totalDays} ימים שונים` : ''}!
+סה"כ נמצאו ${totalSlots} תורים זמינים:
 
-התורים הפנויים:
-${matchingResults.map(appointment => {
-  const isToday = new Date(appointment.date + 'T00:00:00').toDateString() === new Date().toDateString();
-  return `
-${isToday ? '⚡ ' : '📅 '}${getDayNameHebrew(appointment.date)}, ${formatHebrewDate(appointment.date)}
-שעות: ${appointment.times.join(', ')}`;
-}).join('\n')}
+${sortedAppointments.map(appointment => `
+📅 ${formatHebrewDate(appointment.date)} - יום ${getDayNameHebrew(appointment.date)}
+⏰ שעות זמינות: ${appointment.times.join(', ')}
+🔗 לקביעת תור: ${generateBookingUrl(appointment.date)}
+`).join('\n')}
 
-${responseTokens && Object.keys(responseTokens).length > 0 ? `
-האם אחד התורים מתאים לך?
--------------------------
-✓ מצאתי! - ${baseUrl}/appointment-response?token=${Object.values(responseTokens)[0]}&action=taken
-לא מתאים - ${baseUrl}/appointment-response?token=${Object.values(responseTokens)[0]}&action=not_wanted
-` : ''}
+=====================================
+מצאת תור מתאים?
 
-${currentPhase > 1 ? `זו התראה ${currentPhase} מתוך ${maxPhases}\n` : ''}
+✅ המשך לחפש: ${baseUrl}/api/notification-action?token=${actionToken}&action=continue
+🛑 מצאתי תור, עצור התראות: ${baseUrl}/api/notification-action?token=${actionToken}&action=stop
 
-_______________
-נשלח ל: ${subscriberEmail}
-
-הפסק התראות: ${baseUrl}/unsubscribe?token=${unsubscribeToken}
-נהל הגדרות: ${baseUrl}/manage?email=${encodeURIComponent(subscriberEmail)}
-אתר ראשי: ${baseUrl}
-
-Tor-RamEl - מערכת התראות חכמה לתורים
+=====================================
+מערכת התראות אוטומטית למספרת רם-אל
   `.trim();
-
-  return { html, subject, text };
-}; 
+  
+  return { subject, html, text };
+} 

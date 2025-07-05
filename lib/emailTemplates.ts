@@ -4,10 +4,6 @@
 
 // Import template modules
 export { generateAppointmentNotificationEmail } from './emailTemplates/appointmentNotification';
-export { generateWelcomeEmailTemplate } from './emailTemplates/welcomeEmail';
-export { generateConfirmationEmailTemplate } from './emailTemplates/confirmationEmail';
-export { generateReminderEmailTemplate } from './emailTemplates/reminderEmail';
-export { generateUnsubscribeEmailTemplate } from './emailTemplates/unsubscribeEmail';
 
 // Common utilities used across templates
 export const formatHebrewDate = (dateStr: string): string => {
@@ -46,7 +42,3 @@ export const generateBookingUrl = (dateStr: string): string => {
   
   return `${baseUrl}?${params.toString()}`;
 };
-
-// Legacy compatibility - keep these for backward compatibility until migration is complete
-import { generateAppointmentNotificationEmail as _generateAppointmentNotificationEmail } from './emailTemplates/appointmentNotification';
-export const generateModernEmailTemplate = _generateAppointmentNotificationEmail;
