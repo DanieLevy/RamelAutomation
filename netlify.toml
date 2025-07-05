@@ -13,28 +13,17 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-# Schedule auto-check function to run every 5 minutes
-[[functions]]
-  path = "/api/auto-check"
-  name = "auto-check"
+# Scheduled function configurations
+[functions."auto-check"]
   schedule = "*/5 * * * *"
 
-# Schedule process-cached-notifications to run 1 minute after auto-check
-[[functions]]
-  path = "/api/process-cached-notifications"
-  name = "process-cached-notifications"
+[functions."process-cached-notifications"]  
   schedule = "1-59/5 * * * *"
 
-# Schedule process-email-queue to run every 2 minutes
-[[functions]]
-  path = "/api/process-email-queue"
-  name = "process-email-queue"
+[functions."process-email-queue"]
   schedule = "*/2 * * * *"
 
-# Schedule data-cleanup to run daily at 3 AM Israel time (1 AM UTC)
-[[functions]]
-  path = "/api/data-cleanup"
-  name = "data-cleanup"
+[functions."data-cleanup"]
   schedule = "0 1 * * *"
 
 # Environment variables needed for deployment
