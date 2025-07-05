@@ -677,9 +677,8 @@ exports.handler = async (event, context) => {
               
               const { data: sentAppointments, error: sentError } = await supabase
                 .from('sent_appointments')
-                .select('appointment_id')
+                .select('appointment_date, appointment_times')
                 .eq('notification_id', subscription.id)
-                .in('appointment_id', appointmentIds)
               
               if (sentError) {
                 console.error(`📧 ❌ Error checking sent appointments:`, sentError)
@@ -687,7 +686,15 @@ exports.handler = async (event, context) => {
                 continue
               }
               
-              const sentIds = new Set((sentAppointments || []).map(s => s.appointment_id))
+              // Create a set of already sent appointment combinations
+              const sentIds = new Set()
+              if (sentAppointments && sentAppointments.length > 0) {
+                sentAppointments.forEach(sent => {
+                  const id = `${sent.appointment_date}_${sent.appointment_times.join('_')}`
+                  sentIds.add(id)
+                })
+              }
+              
               const newAppointments = appointmentResults.appointments.filter(a => 
                 !sentIds.has(`${a.date}_${a.times.join('_')}`)
               )
@@ -722,7 +729,8 @@ exports.handler = async (event, context) => {
                   // Mark appointments as sent
                   const sentRecords = newAppointments.map(apt => ({
                     notification_id: subscription.id,
-                    appointment_id: `${apt.date}_${apt.times.join('_')}`,
+                    appointment_date: apt.date,
+                    appointment_times: apt.times,
                     sent_at: new Date().toISOString()
                   }))
                   
