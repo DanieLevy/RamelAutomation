@@ -18,10 +18,14 @@ import {
 } from '../components/ui/dialog';
 import { Calendar as CalendarIcon, Clock, Search, Smartphone, Wifi, WifiOff, Share2, Copy, Download, MapPin, ExternalLink, Settings, Bell } from 'lucide-react';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+// Validate environment variables
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+// Create Supabase client only if we have valid URLs
+const supabase = supabaseUrl && supabaseAnonKey
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null;
 
 const LOCAL_STORAGE_TOKEN_KEY = 'ramel_management_token';
 
@@ -116,6 +120,13 @@ export default function ManagePage() {
       setLoading(true);
       setError(null);
 
+      // Check if Supabase is initialized
+      if (!supabase) {
+        setError('שגיאת תצורה: חסרים פרטי חיבור. אנא פנה למנהל המערכת.');
+        setLoading(false);
+        return;
+      }
+
       // Validate token
       const { data: tokenData, error: tokenError } = await supabase
         .from('management_tokens')
@@ -179,6 +190,13 @@ export default function ManagePage() {
     try {
       setLoading(true);
       setError(null);
+
+      // Check if Supabase is initialized
+      if (!supabase) {
+        setError('שגיאת תצורה: חסרים פרטי חיבור. אנא פנה למנהל המערכת.');
+        setLoading(false);
+        return;
+      }
 
       // Load subscriptions
       const { data: notificationData, error: notificationError } = await supabase
@@ -309,6 +327,12 @@ export default function ManagePage() {
 
   const handleDeleteSubscription = async (subscriptionId: string) => {
     try {
+      // Check if Supabase is initialized
+      if (!supabase) {
+        setDeleteError('שגיאת תצורה: חסרים פרטי חיבור. אנא פנה למנהל המערכת.');
+        return;
+      }
+
       const { error } = await supabase
         .from('notifications')
         .delete()
@@ -326,6 +350,12 @@ export default function ManagePage() {
 
   const handleCancelSubscription = async (subscriptionId: string, unsubscribeToken: string) => {
     try {
+      // Check if Supabase is initialized
+      if (!supabase) {
+        alert('שגיאת תצורה: חסרים פרטי חיבור. אנא פנה למנהל המערכת.');
+        return;
+      }
+
       const { error } = await supabase
         .from('notifications')
         .update({ 
