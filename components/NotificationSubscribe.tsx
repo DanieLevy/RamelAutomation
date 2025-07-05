@@ -47,17 +47,29 @@ export default function NotificationSubscribe({
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('[NotificationSubscribe] Form submission started');
+    console.log('[NotificationSubscribe] Form data:', {
+      email: email.trim(),
+      subscriptionType,
+      selectedDate: selectedDate?.toISOString(),
+      startDate: startDate?.toISOString(),
+      endDate: endDate?.toISOString()
+    });
+    
     if (!email.trim()) {
+      console.error('[NotificationSubscribe] Email is empty');
       setMessage('נא להזין כתובת מייל');
       return;
     }
 
     if (subscriptionType === 'single' && !selectedDate) {
+      console.error('[NotificationSubscribe] No date selected for single subscription');
       setMessage('נא לבחור תאריך');
       return;
     }
 
     if (subscriptionType === 'range' && (!startDate || !endDate)) {
+      console.error('[NotificationSubscribe] Missing date range', { startDate, endDate });
       setMessage('נא לבחור טווח תאריכים');
       return;
     }
@@ -78,15 +90,26 @@ export default function NotificationSubscribe({
         requestBody.dateEnd = endDate!.toISOString().split('T')[0];
       }
 
+      console.log('[NotificationSubscribe] Sending request to /api/notify-request');
+      console.log('[NotificationSubscribe] Request body:', requestBody);
+
       const response = await fetch('/api/notify-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody)
       });
 
+      console.log('[NotificationSubscribe] Response status:', response.status);
+      console.log('[NotificationSubscribe] Response headers:', {
+        'content-type': response.headers.get('content-type'),
+        'content-length': response.headers.get('content-length')
+      });
+
       const data = await response.json();
+      console.log('[NotificationSubscribe] Response data:', data);
 
       if (response.ok && data.success) {
+        console.log('[NotificationSubscribe] Subscription successful');
         setMessage('✅ ' + data.message);
         
         // Reset form
@@ -99,10 +122,23 @@ export default function NotificationSubscribe({
           onSubscriptionChange();
         }
       } else {
-        setMessage('❌ ' + (data.error || 'שגיאה בהרשמה'));
+        console.error('[NotificationSubscribe] Subscription failed:', {
+          status: response.status,
+          error: data.error,
+          details: data.details,
+          field: data.field
+        });
+        
+        // Provide more detailed error message
+        let errorMessage = data.error || 'שגיאה בהרשמה';
+        if (data.details) {
+          console.error('[NotificationSubscribe] Error details:', data.details);
+        }
+        setMessage('❌ ' + errorMessage);
       }
     } catch (error) {
-      console.error('Submit error:', error);
+      console.error('[NotificationSubscribe] Submit error:', error);
+      console.error('[NotificationSubscribe] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
       setMessage('❌ שגיאת מערכת. נסה שוב מאוחר יותר.');
     } finally {
       setLoading(false);

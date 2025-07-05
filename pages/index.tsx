@@ -78,20 +78,6 @@ export default function Home() {
           ) : (
             // User connected - show simple interface
             <div className="space-y-6">
-              {/* Welcome Message */}
-              <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 text-center">
-                <p className="text-sm text-muted-foreground mb-1">מחובר כ:</p>
-                <p className="font-medium">{userEmail}</p>
-                <Button
-                  onClick={clearAuth}
-                  variant="ghost"
-                  size="sm"
-                  className="mt-2 text-xs"
-                >
-                  התנתק
-                </Button>
-              </div>
-              
               {/* Quick Actions for connected users */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-center">פעולות מהירות</h3>

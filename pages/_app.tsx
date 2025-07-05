@@ -79,22 +79,22 @@ export default function App({ Component, pageProps }: AppProps) {
           rel="preload"
           href="/fonts/ploni-regular-aaa.otf"
           as="font"
-          type="font/otf"
-          crossOrigin="anonymous"
+          type="font/opentype"
+          crossOrigin=""
         />
         <link
           rel="preload"
           href="/fonts/ploni-light-aaa.otf"
           as="font"
-          type="font/otf"
-          crossOrigin="anonymous"
+          type="font/opentype"
+          crossOrigin=""
         />
         <link
           rel="preload"
           href="/fonts/ploni-ultralight-aaa.otf"
           as="font"
-          type="font/otf"
-          crossOrigin="anonymous"
+          type="font/opentype"
+          crossOrigin=""
         />
         
         {/* Hebrew language and RTL support */}

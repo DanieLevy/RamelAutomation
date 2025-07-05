@@ -54,6 +54,8 @@ export default function UserOTPAuth({ onAuthenticated, className = '' }: UserOTP
     setLoading(true);
     setError('');
     
+    console.log('[UserOTPAuth] Verifying OTP for email:', email);
+    
     try {
       const response = await fetch('/api/verify-user-otp', {
         method: 'POST',
@@ -62,13 +64,21 @@ export default function UserOTPAuth({ onAuthenticated, className = '' }: UserOTP
       });
       
       const data = await response.json();
+      console.log('[UserOTPAuth] OTP verification response:', { 
+        status: response.status, 
+        hasToken: !!data.token,
+        tokenLength: data.token?.length 
+      });
       
       if (response.ok) {
+        console.log('[UserOTPAuth] OTP verified successfully, calling onAuthenticated');
         onAuthenticated(email, data.token);
       } else {
+        console.error('[UserOTPAuth] OTP verification failed:', data.error);
         setError(data.error || 'קוד אימות שגוי');
       }
     } catch (error) {
+      console.error('[UserOTPAuth] OTP verification error:', error);
       setError('שגיאה בחיבור לשרת');
     } finally {
       setLoading(false);

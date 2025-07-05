@@ -4,38 +4,75 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 const supabase = supabaseAdmin;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Debug logging
+  // Enhanced debug logging
   console.log('=== NOTIFY REQUEST DEBUG ===');
   console.log('Method:', req.method);
-  console.log('Headers:', req.headers);
-  console.log('Body:', req.body);
+  console.log('Headers:', {
+    'content-type': req.headers['content-type'],
+    'origin': req.headers.origin,
+    'referer': req.headers.referer
+  });
+  console.log('Body:', JSON.stringify(req.body, null, 2));
   console.log('Body type:', typeof req.body);
   console.log('Body keys:', req.body ? Object.keys(req.body) : 'no body');
   console.log('========================');
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    console.error('[notify-request] Invalid method:', req.method);
+    return res.status(405).json({ 
+      error: 'Method not allowed',
+      details: `Expected POST, received ${req.method}`
+    });
   }
 
   // Check if body exists
   if (!req.body) {
-    return res.status(400).json({ error: 'Missing request body' });
+    console.error('[notify-request] Missing request body');
+    return res.status(400).json({ 
+      error: 'Missing request body',
+      details: 'Request body is required'
+    });
   }
 
   try {
     const { email, subscriptionType, targetDate, dateStart, dateEnd } = req.body;
     
     // More debug logging
-    console.log('Extracted values:', { email, subscriptionType, targetDate, dateStart, dateEnd });
+    console.log('[notify-request] Extracted values:', { 
+      email, 
+      subscriptionType, 
+      targetDate, 
+      dateStart, 
+      dateEnd 
+    });
 
     // Validate email
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return res.status(400).json({ error: 'כתובת מייל לא תקינה' });
+    if (!email) {
+      console.error('[notify-request] Missing email');
+      return res.status(400).json({ 
+        error: 'כתובת מייל חסרה',
+        field: 'email',
+        details: 'Email is required'
+      });
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      console.error('[notify-request] Invalid email format:', email);
+      return res.status(400).json({ 
+        error: 'כתובת מייל לא תקינה',
+        field: 'email',
+        details: `Invalid email format: ${email}`
+      });
     }
 
     // Validate subscription type
     if (!subscriptionType || !['single', 'range'].includes(subscriptionType)) {
-      return res.status(400).json({ error: 'סוג מינוי לא תקין' });
+      console.error('[notify-request] Invalid subscription type:', subscriptionType);
+      return res.status(400).json({ 
+        error: 'סוג מינוי לא תקין',
+        field: 'subscriptionType',
+        details: `Expected 'single' or 'range', received: ${subscriptionType}`
+      });
     }
 
     // Validate dates based on subscription type
