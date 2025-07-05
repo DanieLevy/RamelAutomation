@@ -631,11 +631,84 @@ exports.handler = async (event, context) => {
       new Promise(resolve => setTimeout(() => resolve(false), 2000)) // 2 second timeout
     ])
     
+    // INTEGRATED EMAIL PROCESSING - Process emails directly if appointments found
+    let emailResult = { processed: false, message: 'No appointments to notify' }
+    
+    if (appointmentResults.found && appointmentResults.appointments.length > 0) {
+      console.log('📧 Processing email notifications directly...')
+      
+      try {
+        // Get active subscriptions
+        const { data: subscriptions, error: subError } = await supabase
+          .from('notifications_simple')
+          .select('*')
+          .eq('status', 'active')
+        
+        if (!subError && subscriptions && subscriptions.length > 0) {
+          console.log(`📧 Found ${subscriptions.length} active subscriptions`)
+          
+          // Process each subscription (simplified version)
+          let emailsQueued = 0
+          let emailsSkipped = 0
+          
+          for (const subscription of subscriptions) {
+            // Check if we've already sent these appointments
+            const appointmentIds = appointmentResults.appointments.map(a => `${a.date}_${a.times.join('_')}`)
+            
+            const { data: sentAppointments } = await supabase
+              .from('sent_appointments')
+              .select('appointment_id')
+              .eq('notification_id', subscription.id)
+              .in('appointment_id', appointmentIds)
+            
+            const sentIds = new Set((sentAppointments || []).map(s => s.appointment_id))
+            const newAppointments = appointmentResults.appointments.filter(a => 
+              !sentIds.has(`${a.date}_${a.times.join('_')}`)
+            )
+            
+            if (newAppointments.length > 0) {
+              console.log(`📧 Queueing email for ${subscription.email} with ${newAppointments.length} new appointments`)
+              emailsQueued++
+              
+              // Queue email (simplified - just log for now)
+              await supabase
+                .from('email_queue')
+                .insert({
+                  to: subscription.email,
+                  subject: `${newAppointments.length} New Appointments Available - Tor Ramel`,
+                  template: 'appointment_notification',
+                  data: {
+                    appointments: newAppointments,
+                    notificationId: subscription.id
+                  },
+                  status: 'pending'
+                })
+            } else {
+              emailsSkipped++
+            }
+          }
+          
+          emailResult = {
+            processed: true,
+            message: `Processed ${subscriptions.length} subscriptions`,
+            emailsQueued,
+            emailsSkipped
+          }
+          
+          console.log(`📧 Email processing complete: ${emailsQueued} queued, ${emailsSkipped} skipped`)
+        }
+      } catch (emailError) {
+        console.error('📧 Email processing error:', emailError)
+        emailResult = {
+          processed: false,
+          message: `Email error: ${emailError.message}`,
+          error: emailError.message
+        }
+      }
+    }
+    
     const totalTime = Math.round((Date.now() - functionStart) / 1000)
     console.log(`⚡ FUNCTION COMPLETED in ${totalTime}s (target: <8s)`)
-    
-    // REMOVED EMAIL PROCESSING - Now handled by separate function
-    console.log('📧 Email processing will be handled by process-notifications function')
     
     const responseBody = {
       success: true,
@@ -645,14 +718,15 @@ exports.handler = async (event, context) => {
         appointmentCount: appointmentResults.appointments.length,
         summary: appointmentResults.summary,
         appointments: appointmentResults.appointments,
-        cacheUpdated: cacheWriteResult
+        cacheUpdated: cacheWriteResult,
+        emailProcessing: emailResult
       },
       meta: {
         cacheKey: 'auto-check-results',
         nextCheckIn: '5 minutes',
         optimizedFor: 'speed',
         executionTarget: '<8 seconds',
-        emailProcessing: 'deferred'
+        emailProcessing: 'integrated'
       }
     }
     
