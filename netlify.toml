@@ -13,10 +13,6 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-[functions]
-  # Global function configuration  
-  directory = "netlify/functions"
-
 # Schedule auto-check function to run every 5 minutes
 [[functions]]
   path = "/api/auto-check"
