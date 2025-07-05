@@ -13,19 +13,6 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-# Scheduled function configurations
-[functions."auto-check"]
-  schedule = "*/5 * * * *"
-
-[functions."process-cached-notifications"]  
-  schedule = "1-59/5 * * * *"
-
-[functions."process-email-queue"]
-  schedule = "*/2 * * * *"
-
-[functions."data-cleanup"]
-  schedule = "0 1 * * *"
-
 # Environment variables needed for deployment
 # Set these in Netlify dashboard:
 # USER_ID = "4481"
