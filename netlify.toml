@@ -9,7 +9,6 @@
   ADMIN_SECRET = "f1039cc377c4a66a8167e943defe23a7e687d13b8cf11a2be91761dc39500234"
   NEXT_USE_NETLIFY_EDGE = "false"
 
-
 # Use Next.js plugin for automatic handling
 [[plugins]]
   package = "@netlify/plugin-nextjs"
@@ -17,26 +16,6 @@
 [functions]
   # Global function configuration  
   directory = "netlify/functions"
-
-# Auto-check function configuration
-[functions."auto-check"]
-  schedule = "*/5 * * * *" # every 5 minutes
-  timeout = 900  # 15 minutes maximum (unlimited until we get it working)
-
-# Email queue processing function configuration
-[functions."process-email-queue"]
-  schedule = "0 */2 * * *" # every 2 hours
-  timeout = 300  # 5 minutes maximum
-
-# Data cleanup function configuration
-[functions."data-cleanup"]
-  schedule = "0 3 * * *" # daily at 3 AM
-  timeout = 300  # 5 minutes maximum
-
-# Batch notifications processing function configuration
-[functions."process-batch-notifications"]
-  schedule = "*/30 * * * *" # every 30 minutes
-  timeout = 300  # 5 minutes maximum
 
 # Schedule auto-check function to run every 5 minutes
 [[functions]]
