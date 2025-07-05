@@ -175,7 +175,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { email } = req.body;
+  const { email, includeStats } = req.body;
 
   if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     return res.status(400).json({ error: 'כתובת מייל לא תקינה' });
@@ -267,6 +267,63 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
+    // Only fetch full stats if requested
+    let stats = {};
+    if (includeStats === 'true') {
+      try {
+        // Get active subscriptions from notifications_simple
+        const { data: activeSubscriptions, error: subError } = await supabase
+          .from('notifications_simple')
+          .select('*', { count: 'exact' })
+          .eq('status', 'active');
+
+        if (subError) {
+          console.error('Error fetching subscription stats:', subError);
+        }
+
+        // Get cache data
+        const { data: cacheData, error: cacheError } = await supabase
+          .from('cache')
+          .select('value')
+          .eq('key', 'auto-check-results')
+          .single();
+
+        if (cacheError) {
+          console.error('Error fetching cache stats:', cacheError);
+        }
+
+        // Get email queue stats
+        const { data: queueData, error: queueError } = await supabase
+          .from('email_queue')
+          .select('status', { count: 'exact' })
+          .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
+        if (queueError) {
+          console.error('Error fetching email queue stats:', queueError);
+        }
+
+        // Calculate stats
+        const pendingEmails = queueData?.filter(e => e.status === 'pending').length || 0;
+        const sentEmails = queueData?.filter(e => e.status === 'sent').length || 0;
+        const failedEmails = queueData?.filter(e => e.status === 'failed').length || 0;
+
+        stats = {
+          activeSubscriptions: activeSubscriptions?.length || 0,
+          lastCheckResult: cacheData?.value || null,
+          emailQueue: {
+            pending: pendingEmails,
+            sent: sentEmails,
+            failed: failedEmails,
+            total: queueData?.length || 0
+          },
+          timestamp: new Date().toISOString()
+        };
+      } catch (statsError) {
+        console.error('Error gathering stats:', statsError);
+        // Don't fail the whole request if stats fail
+      }
+    }
+
     // Send management email
     try {
       const transporter = nodemailer.createTransport({
@@ -304,7 +361,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({
       success: true,
       message: `נשלח קישור לניהול ההתראות לכתובת ${email}. בדוק את תיבת הדואר שלך.`,
-      subscriptionCount: subscriptions.length
+      subscriptionCount: subscriptions.length,
+      stats: stats
     });
 
   } catch (error) {

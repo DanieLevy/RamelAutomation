@@ -8,61 +8,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { id, updates } = req.body;
+  const { subscriptionId, status } = req.body;
 
-  // Validate inputs
-  if (!id) {
-    return res.status(400).json({ error: 'Subscription ID is required' });
+  if (!subscriptionId || !status) {
+    return res.status(400).json({ error: 'Subscription ID and status are required' });
   }
 
-  if (!updates || typeof updates !== 'object') {
-    return res.status(400).json({ error: 'Updates object is required' });
-  }
-
-  // Validate specific update fields if provided
-  if ('max_notifications' in updates) {
-    const max = parseInt(updates.max_notifications);
-    if (isNaN(max) || max < 1 || max > 10) {
-      return res.status(400).json({ 
-        error: 'Invalid max_notifications value. Must be between 1 and 10' 
-      });
-    }
-  }
-
-  if ('interval_minutes' in updates) {
-    const interval = parseInt(updates.interval_minutes);
-    if (isNaN(interval) || interval < 0 || interval > 1440) {
-      return res.status(400).json({ 
-        error: 'Invalid interval_minutes value. Must be between 0 and 1440' 
-      });
-    }
+  // Validate status
+  const validStatuses = ['active', 'stopped', 'expired'];
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({ error: 'Invalid status. Must be one of: active, stopped, expired' });
   }
 
   try {
-    // Add updated_at timestamp
-    const updateData = {
-      ...updates,
-      updated_at: new Date().toISOString()
-    };
-
+    // Update the subscription status
     const { data, error } = await supabase
-      .from('notifications')
-      .update(updateData)
-      .eq('id', id)
+      .from('notifications_simple')
+      .update({
+        status: status,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', subscriptionId)
       .select()
       .single();
 
     if (error) {
       console.error('Failed to update subscription:', error);
-      
-      // Handle specific error cases
-      if (error.code === 'PGRST116') {
-        return res.status(404).json({ 
-          error: 'Subscription not found',
-          details: 'No subscription exists with the provided ID'
-        });
-      }
-      
       return res.status(500).json({ 
         error: 'Failed to update subscription',
         details: error.message 
@@ -70,18 +41,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (!data) {
-      return res.status(404).json({ 
-        error: 'Subscription not found',
-        details: 'No subscription exists with the provided ID'
-      });
+      return res.status(404).json({ error: 'Subscription not found' });
     }
-
-    console.log(`Updated subscription ${id}:`, updateData);
 
     return res.status(200).json({ 
       success: true,
-      subscription: data,
-      message: 'Subscription updated successfully'
+      message: `Subscription ${status === 'stopped' ? 'stopped' : 'updated'} successfully`,
+      subscription: data
     });
   } catch (error) {
     console.error('Update subscription API error:', error);

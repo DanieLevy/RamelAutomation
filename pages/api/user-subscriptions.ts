@@ -1,44 +1,55 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { NextApiRequest, NextApiResponse } from 'next'
+import { createClient } from '@supabase/supabase-js'
 
-const supabase = supabaseAdmin;
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_KEY!
+)
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { email } = req.body;
+  const { email } = req.query
 
-  if (!email) {
-    return res.status(400).json({ error: 'Email is required' });
+  if (!email || typeof email !== 'string') {
+    return res.status(400).json({ error: 'Email is required' })
   }
 
   try {
-    const { data: subscriptions, error } = await supabase
-      .from('notifications')
+    const { data, error } = await supabase
+      .from('notifications_simple')
       .select('*')
-      .eq('email', email)
-      .is('deleted_at', null) // Exclude soft-deleted records
-      .order('created_at', { ascending: false });
+      .eq('email', email.toLowerCase())
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('Failed to fetch user subscriptions:', error);
-      return res.status(500).json({ 
-        error: 'Failed to fetch subscriptions',
-        details: error.message 
-      });
+      console.error('Database error:', error)
+      return res.status(500).json({ error: 'Failed to fetch subscriptions' })
     }
 
-    return res.status(200).json({ 
-      success: true,
-      subscriptions: subscriptions || [] 
-    });
+    // Transform data to match expected format
+    const transformedData = data?.map(sub => ({
+      id: sub.id,
+      email: sub.email,
+      subscription_type: sub.subscription_type,
+      target_date: sub.target_date,
+      date_start: sub.date_start,
+      date_end: sub.date_end,
+      status: sub.status,
+      created_at: sub.created_at,
+      // Add display fields for UI
+      dateDisplay: sub.subscription_type === 'single' 
+        ? sub.target_date 
+        : `${sub.date_start} - ${sub.date_end}`,
+      typeDisplay: sub.subscription_type === 'single' ? 'יום בודד' : 'טווח תאריכים'
+    })) || []
+
+    return res.status(200).json({ subscriptions: transformedData })
   } catch (error) {
-    console.error('User subscriptions API error:', error);
-    return res.status(500).json({ 
-      error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    });
+    console.error('Error:', error)
+    return res.status(500).json({ error: 'Failed to fetch subscriptions' })
   }
 } 
