@@ -28,10 +28,9 @@ export default function NotificationsPage() {
 
   const loadSubscriptionCount = useCallback(async (email: string) => {
     try {
-      const response = await fetch('/api/user-subscriptions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
+      const response = await fetch(`/api/user-subscriptions?email=${encodeURIComponent(email)}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
       });
       
       if (response.ok) {

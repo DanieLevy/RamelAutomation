@@ -45,9 +45,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
       
       // Check if date is not in the past
-      const selectedDate = new Date(targetDate);
+      const selectedDate = new Date(targetDate + 'T00:00:00');
       const today = new Date();
       today.setHours(0, 0, 0, 0);
+      
+      console.log('Date validation:', {
+        targetDate,
+        selectedDate: selectedDate.toISOString(),
+        today: today.toISOString(),
+        isPast: selectedDate < today
+      });
       
       if (selectedDate < today) {
         return res.status(400).json({ error: 'לא ניתן לבחור תאריך שעבר' });
@@ -57,10 +64,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'יש לבחור טווח תאריכים' });
       }
       
-      const startDate = new Date(dateStart);
-      const endDate = new Date(dateEnd);
+      const startDate = new Date(dateStart + 'T00:00:00');
+      const endDate = new Date(dateEnd + 'T00:00:00');
       const today = new Date();
       today.setHours(0, 0, 0, 0);
+      
+      console.log('Range validation:', {
+        dateStart,
+        dateEnd,
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        today: today.toISOString(),
+        startIsPast: startDate < today,
+        endBeforeStart: endDate < startDate
+      });
       
       if (startDate < today) {
         return res.status(400).json({ error: 'תאריך התחלה לא יכול להיות בעבר' });
@@ -71,7 +88,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
       
       // Limit range to 30 days as per requirements
-      const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end dates
+      console.log('Days difference:', daysDiff);
+      
       if (daysDiff > 30) {
         return res.status(400).json({ error: 'טווח התאריכים לא יכול לעלות על 30 יום' });
       }
