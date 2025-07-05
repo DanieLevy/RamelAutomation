@@ -19,7 +19,16 @@
     "test:emails": "node scripts/test-emails.js",
     "test:comprehensive": "node scripts/comprehensive-test.js",
     "test:email-system": "node scripts/test-fixed-email-system.js",
-    "test:enhanced-system": "node scripts/test-enhanced-email-system.js"
+    "test:enhanced-system": "node scripts/test-enhanced-email-system.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test:email": "node scripts/test-email-processing.js",
+    "test:force-email": "node scripts/test-force-email.js",
+    "test:notify": "node scripts/test-simplified-notification.js",
+    "test:notification-flow": "node scripts/test-full-notification-flow.js",
+    "test:api": "powershell -ExecutionPolicy Bypass -File scripts/test-api.ps1",
+    "dev:clean": "node scripts/clear-and-dev.js",
+    "monitor:functions": "node scripts/monitor-function-health.js",
+    "debug:env": "node scripts/debug-env.js"
   },
   "dependencies": {
     "@netlify/functions": "^4.1.6",

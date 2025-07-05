@@ -20,6 +20,7 @@ interface InlineDatePickerProps {
   disableDays?: string[]; // Array of day names to disable (e.g., ['Monday', 'Saturday'])
   maxRange?: number; // Maximum number of days for range selection
   className?: string;
+  existingDates?: string[]; // Array of ISO date strings that have existing subscriptions
 }
 
 export default function InlineDatePicker({ 
@@ -39,7 +40,8 @@ export default function InlineDatePicker({
   disablePast = false,
   disableDays = [],
   maxRange,
-  className = ''
+  className = '',
+  existingDates = []
 }: InlineDatePickerProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [internalSelectedRange, setInternalSelectedRange] = useState<{ start: Date | null, end: Date | null }>({
@@ -109,30 +111,50 @@ export default function InlineDatePicker({
   };
 
   const handleDateClick = (date: Date) => {
-    if (isDateDisabled(date)) return;
+    if (isDateDisabled(date)) {
+      console.log('[InlineDatePicker] Date click blocked - disabled date:', date.toISOString());
+      return;
+    }
+
+    console.log('[InlineDatePicker] Date clicked:', {
+      date: date.toISOString(),
+      mode,
+      currentSelection: mode === 'single' ? selectedDate : internalSelectedRange
+    });
 
     if (mode === 'single') {
       // Use new callback if available, otherwise fallback to legacy
       if (onDateSelect) {
+        console.log('[InlineDatePicker] Calling onDateSelect with:', date.toISOString());
         onDateSelect(date);
       } else if (onChange) {
+        console.log('[InlineDatePicker] Calling onChange (legacy) with:', date.toISOString());
         onChange(date);
       }
     } else {
       // Range mode
       if (!internalSelectedRange.start || (internalSelectedRange.start && internalSelectedRange.end)) {
         // Start new range
+        console.log('[InlineDatePicker] Starting new range selection:', date.toISOString());
         setInternalSelectedRange({ start: date, end: null });
       } else if (internalSelectedRange.start && !internalSelectedRange.end) {
         // Complete range
         const start = internalSelectedRange.start;
         const end = date;
         
+        console.log('[InlineDatePicker] Completing range selection:', {
+          start: start.toISOString(),
+          end: end.toISOString()
+        });
+        
         // Check max range if specified
         if (maxRange) {
           const daysDiff = Math.ceil(Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+          console.log('[InlineDatePicker] Range days difference:', daysDiff, 'Max allowed:', maxRange);
+          
           if (daysDiff > maxRange) {
             // Reset selection if exceeds max range
+            console.log('[InlineDatePicker] Range exceeds maximum, resetting to new start date');
             setInternalSelectedRange({ start: date, end: null });
             return;
           }
@@ -142,15 +164,31 @@ export default function InlineDatePicker({
           setInternalSelectedRange({ start, end });
           // Use new callback if available, otherwise fallback to legacy
           if (onRangeSelect) {
+            console.log('[InlineDatePicker] Calling onRangeSelect with:', {
+              start: start.toISOString(),
+              end: end.toISOString()
+            });
             onRangeSelect(start, end);
           } else if (onRangeChange) {
+            console.log('[InlineDatePicker] Calling onRangeChange (legacy) with:', {
+              start: start.toISOString(),
+              end: end.toISOString()
+            });
             onRangeChange(start, end);
           }
         } else {
           setInternalSelectedRange({ start: end, end: start });
           if (onRangeSelect) {
+            console.log('[InlineDatePicker] Calling onRangeSelect with swapped dates:', {
+              start: end.toISOString(),
+              end: start.toISOString()
+            });
             onRangeSelect(end, start);
           } else if (onRangeChange) {
+            console.log('[InlineDatePicker] Calling onRangeChange (legacy) with swapped dates:', {
+              start: end.toISOString(),
+              end: start.toISOString()
+            });
             onRangeChange(end, start);
           }
         }
@@ -179,6 +217,17 @@ export default function InlineDatePicker({
     return date > internalSelectedRange.start && date < internalSelectedRange.end;
   };
 
+  const isDateHoverInRange = (date: Date, hoverDate: Date | null) => {
+    if (mode !== 'range' || !internalSelectedRange.start || internalSelectedRange.end || !hoverDate) return false;
+    const start = internalSelectedRange.start;
+    const end = hoverDate;
+    if (start <= end) {
+      return date > start && date < end;
+    } else {
+      return date > end && date < start;
+    }
+  };
+
   const isDateRangeStart = (date: Date) => {
     return mode === 'range' && internalSelectedRange.start && date.toDateString() === internalSelectedRange.start.toDateString();
   };
@@ -196,6 +245,12 @@ export default function InlineDatePicker({
   };
 
   const days = getDaysInMonth(currentMonth);
+  const [hoverDate, setHoverDate] = useState<Date | null>(null);
+
+  const hasExistingSubscription = (date: Date) => {
+    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    return existingDates.includes(dateStr);
+  };
 
   return (
     <div className={`bg-background border border-border rounded-xl p-4 ${className}`}>
@@ -245,19 +300,24 @@ export default function InlineDatePicker({
 
           const selected = isDateSelected(date);
           const inRange = isDateInRange(date);
+          const hoverInRange = isDateHoverInRange(date, hoverDate);
           const rangeStart = isDateRangeStart(date);
           const rangeEnd = isDateRangeEnd(date);
           const disabled = isDateDisabled(date);
+          const hasExisting = hasExistingSubscription(date);
 
           return (
             <button
               key={index}
+              type="button"
               onClick={() => !disabled && handleDateClick(date)}
+              onMouseEnter={() => !disabled && setHoverDate(date)}
+              onMouseLeave={() => setHoverDate(null)}
               disabled={disabled}
               className={`
                 h-8 text-xs font-medium rounded-md transition-colors relative
                 ${disabled 
-                  ? 'text-muted-foreground/50 cursor-not-allowed line-through' 
+                  ? 'text-muted-foreground/50 cursor-not-allowed line-through opacity-50' 
                   : 'hover:bg-muted/60 cursor-pointer'
                 }
                 ${selected && mode === 'single' 
@@ -272,11 +332,24 @@ export default function InlineDatePicker({
                   ? 'bg-primary/20 text-primary hover:bg-primary/30' 
                   : ''
                 }
+                ${hoverInRange && mode === 'range' && internalSelectedRange.start && !internalSelectedRange.end
+                  ? 'bg-primary/10 text-primary' 
+                  : ''
+                }
+                ${hasExisting && !selected && !rangeStart && !rangeEnd
+                  ? 'ring-2 ring-primary/50 ring-inset' 
+                  : ''
+                }
               `}
+              aria-label={`${date.getDate()} ${monthNames[date.getMonth()]} ${date.getFullYear()}${disabled ? ' (לא זמין)' : ''}${hasExisting ? ' (קיים מינוי)' : ''}`}
+              title={disabled ? 'תאריך לא זמין' : hasExisting ? 'קיים מינוי לתאריך זה' : ''}
             >
               {date.getDate()}
               {date.toDateString() === today.toDateString() && (
                 <div className="absolute bottom-0.5 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-current rounded-full opacity-60"></div>
+              )}
+              {hasExisting && (
+                <div className="absolute top-0.5 right-0.5 w-1.5 h-1.5 bg-primary rounded-full"></div>
               )}
             </button>
           );
@@ -296,7 +369,10 @@ export default function InlineDatePicker({
               </>
             ) : (
               <>
-                בחר תאריך סיום
+                <div className="font-medium text-foreground mb-1">
+                  נבחר תאריך התחלה: {internalSelectedRange.start.toLocaleDateString('he-IL')}
+                </div>
+                <div>לחץ על תאריך נוסף לבחירת תאריך סיום</div>
                 {maxRange && <div className="text-[10px] mt-1">(מקסימום {maxRange} ימים)</div>}
               </>
             )}

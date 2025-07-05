@@ -8,6 +8,14 @@ interface NotificationSubscribeProps {
   onSubscriptionChange?: () => void;
 }
 
+interface ExistingSubscription {
+  id: string;
+  subscription_type: 'single' | 'range';
+  target_date?: string;
+  date_start?: string;
+  date_end?: string;
+}
+
 export default function NotificationSubscribe({ 
   defaultEmail,
   onSubscriptionChange 
@@ -20,13 +28,28 @@ export default function NotificationSubscribe({
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [isEmailValid, setIsEmailValid] = useState(false);
+  const [existingSubscriptions, setExistingSubscriptions] = useState<ExistingSubscription[]>([]);
+  const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
 
   useEffect(() => {
     if (defaultEmail) {
       setEmail(defaultEmail);
       validateEmail(defaultEmail);
+      loadExistingSubscriptions(defaultEmail);
     }
   }, [defaultEmail]);
+
+  const loadExistingSubscriptions = async (userEmail: string) => {
+    try {
+      const response = await fetch(`/api/user-subscriptions?email=${encodeURIComponent(userEmail)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setExistingSubscriptions(data.subscriptions || []);
+      }
+    } catch (error) {
+      console.error('Failed to load existing subscriptions:', error);
+    }
+  };
 
   const validateEmail = (email: string) => {
     const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -44,6 +67,31 @@ export default function NotificationSubscribe({
     setEndDate(end);
   };
 
+  const validateForm = (): boolean => {
+    const errors: {[key: string]: string} = {};
+    
+    if (!email.trim()) {
+      errors.email = 'נא להזין כתובת מייל';
+    } else if (!isEmailValid) {
+      errors.email = 'כתובת מייל לא תקינה';
+    }
+    
+    if (subscriptionType === 'single' && !selectedDate) {
+      errors.date = 'נא לבחור תאריך';
+    }
+    
+    if (subscriptionType === 'range') {
+      if (!startDate) {
+        errors.dateRange = 'נא לבחור תאריך התחלה';
+      } else if (!endDate) {
+        errors.dateRange = 'נא לבחור תאריך סיום';
+      }
+    }
+    
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -56,21 +104,8 @@ export default function NotificationSubscribe({
       endDate: endDate?.toISOString()
     });
     
-    if (!email.trim()) {
-      console.error('[NotificationSubscribe] Email is empty');
-      setMessage('נא להזין כתובת מייל');
-      return;
-    }
-
-    if (subscriptionType === 'single' && !selectedDate) {
-      console.error('[NotificationSubscribe] No date selected for single subscription');
-      setMessage('נא לבחור תאריך');
-      return;
-    }
-
-    if (subscriptionType === 'range' && (!startDate || !endDate)) {
-      console.error('[NotificationSubscribe] Missing date range', { startDate, endDate });
-      setMessage('נא לבחור טווח תאריכים');
+    if (!validateForm()) {
+      console.log('[NotificationSubscribe] Form validation failed:', validationErrors);
       return;
     }
 
@@ -84,10 +119,22 @@ export default function NotificationSubscribe({
       };
 
       if (subscriptionType === 'single') {
-        requestBody.targetDate = selectedDate!.toISOString().split('T')[0];
+        // Format date to YYYY-MM-DD in local timezone
+        const year = selectedDate!.getFullYear();
+        const month = String(selectedDate!.getMonth() + 1).padStart(2, '0');
+        const day = String(selectedDate!.getDate()).padStart(2, '0');
+        requestBody.targetDate = `${year}-${month}-${day}`;
       } else {
-        requestBody.dateStart = startDate!.toISOString().split('T')[0];
-        requestBody.dateEnd = endDate!.toISOString().split('T')[0];
+        // Format dates to YYYY-MM-DD in local timezone
+        const startYear = startDate!.getFullYear();
+        const startMonth = String(startDate!.getMonth() + 1).padStart(2, '0');
+        const startDay = String(startDate!.getDate()).padStart(2, '0');
+        requestBody.dateStart = `${startYear}-${startMonth}-${startDay}`;
+        
+        const endYear = endDate!.getFullYear();
+        const endMonth = String(endDate!.getMonth() + 1).padStart(2, '0');
+        const endDay = String(endDate!.getDate()).padStart(2, '0');
+        requestBody.dateEnd = `${endYear}-${endMonth}-${endDay}`;
       }
 
       console.log('[NotificationSubscribe] Sending request to /api/notify-request');
@@ -121,6 +168,11 @@ export default function NotificationSubscribe({
         if (onSubscriptionChange) {
           onSubscriptionChange();
         }
+        
+        // Reload subscriptions
+        if (email) {
+          loadExistingSubscriptions(email);
+        }
       } else {
         console.error('[NotificationSubscribe] Subscription failed:', {
           status: response.status,
@@ -143,6 +195,28 @@ export default function NotificationSubscribe({
     } finally {
       setLoading(false);
     }
+  };
+
+  // Convert existing subscriptions to date strings for the date picker
+  const getExistingDates = (): string[] => {
+    const dates: string[] = [];
+    existingSubscriptions.forEach(sub => {
+      if (sub.subscription_type === 'single' && sub.target_date) {
+        dates.push(sub.target_date);
+      } else if (sub.subscription_type === 'range' && sub.date_start && sub.date_end) {
+        // Add all dates in the range
+        const start = new Date(sub.date_start);
+        const end = new Date(sub.date_end);
+        const current = new Date(start);
+        
+        while (current <= end) {
+          const dateStr = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
+          dates.push(dateStr);
+          current.setDate(current.getDate() + 1);
+        }
+      }
+    });
+    return dates;
   };
 
   return (
@@ -173,6 +247,11 @@ export default function NotificationSubscribe({
             {email && !isEmailValid && (
               <span className="text-xs text-destructive block text-right">
                 כתובת מייל לא תקינה
+              </span>
+            )}
+            {validationErrors.email && !email && (
+              <span className="text-xs text-destructive block text-right">
+                {validationErrors.email}
               </span>
             )}
           </div>
@@ -229,8 +308,32 @@ export default function NotificationSubscribe({
               disablePast={true}
               disableDays={['Monday', 'Saturday']}
               maxRange={30}
+              existingDates={getExistingDates()}
             />
+            
+            {/* Clear button */}
+            {((subscriptionType === 'single' && selectedDate) || 
+              (subscriptionType === 'range' && (startDate || endDate))) && (
+              <div className="mt-3 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedDate(null);
+                    setStartDate(null);
+                    setEndDate(null);
+                  }}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  נקה בחירה
+                </button>
+              </div>
+            )}
           </div>
+          {(validationErrors.date || validationErrors.dateRange) && (
+            <span className="text-xs text-destructive block text-right mt-2">
+              {validationErrors.date || validationErrors.dateRange}
+            </span>
+          )}
         </div>
 
         {/* Summary */}

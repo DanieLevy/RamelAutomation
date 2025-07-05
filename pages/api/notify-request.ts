@@ -81,22 +81,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'יש לבחור תאריך' });
       }
       
-      // Parse date in local timezone
-      const [year, month, day] = targetDate.split('-').map(Number);
-      const selectedDate = new Date(year, month - 1, day); // month is 0-indexed
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      // Use string comparison to avoid timezone issues
+      const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
       
       console.log('Date validation:', {
         targetDate,
-        selectedDate: selectedDate.toISOString(),
-        selectedDateLocal: selectedDate.toLocaleDateString('he-IL'),
-        today: today.toISOString(),
-        todayLocal: today.toLocaleDateString('he-IL'),
-        isPast: selectedDate < today
+        todayStr,
+        isPast: targetDate < todayStr
       });
       
-      if (selectedDate < today) {
+      if (targetDate < todayStr) {
         return res.status(400).json({ error: 'לא ניתן לבחור תאריך שעבר' });
       }
     } else if (subscriptionType === 'range') {
@@ -104,89 +98,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'יש לבחור טווח תאריכים' });
       }
       
-      // Parse dates in local timezone
-      const [startYear, startMonth, startDay] = dateStart.split('-').map(Number);
-      const [endYear, endMonth, endDay] = dateEnd.split('-').map(Number);
-      const startDate = new Date(startYear, startMonth - 1, startDay);
-      const endDate = new Date(endYear, endMonth - 1, endDay);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      // Use string comparison to avoid timezone issues
+      const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
       
       console.log('Range validation:', {
         dateStart,
         dateEnd,
-        startDate: startDate.toISOString(),
-        startDateLocal: startDate.toLocaleDateString('he-IL'),
-        endDate: endDate.toISOString(),
-        endDateLocal: endDate.toLocaleDateString('he-IL'),
-        today: today.toISOString(),
-        todayLocal: today.toLocaleDateString('he-IL'),
-        startIsPast: startDate < today,
-        endBeforeStart: endDate < startDate
+        todayStr,
+        startIsPast: dateStart < todayStr,
+        endBeforeStart: dateEnd < dateStart
       });
       
-      if (startDate < today) {
+      if (dateStart < todayStr) {
         return res.status(400).json({ error: 'תאריך התחלה לא יכול להיות בעבר' });
       }
       
-      if (endDate < startDate) {
+      if (dateEnd < dateStart) {
         return res.status(400).json({ error: 'תאריך סיום חייב להיות אחרי תאריך התחלה' });
       }
       
       // Limit range to 30 days as per requirements
-      const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end dates
+      const start = new Date(dateStart);
+      const end = new Date(dateEnd);
+      const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end dates
       console.log('Days difference:', daysDiff);
       
       if (daysDiff > 30) {
         return res.status(400).json({ error: 'טווח התאריכים לא יכול לעלות על 30 יום' });
-      }
-    }
-
-    // Check for existing active subscription for this email
-    const { data: existingSubscriptions, error: checkError } = await supabase
-      .from('notifications_simple')
-      .select('id, subscription_type, target_date, date_start, date_end')
-      .eq('email', email)
-      .eq('status', 'active');
-
-    if (checkError) {
-      console.error('Error checking existing subscriptions:', checkError);
-      return res.status(500).json({ error: 'שגיאה בבדיקת מינויים קיימים' });
-    }
-
-    console.log('Existing subscriptions:', existingSubscriptions);
-
-    // Check for overlapping subscriptions
-    if (existingSubscriptions && existingSubscriptions.length > 0) {
-      for (const sub of existingSubscriptions) {
-        console.log('Checking overlap with subscription:', sub);
-        
-        if (subscriptionType === 'single' && sub.subscription_type === 'single') {
-          if (sub.target_date === targetDate) {
-            console.log('Found duplicate single date subscription');
-            return res.status(400).json({ 
-              error: 'כבר קיים מינוי פעיל לתאריך זה' 
-            });
-          }
-        } else if (subscriptionType === 'range' || sub.subscription_type === 'range') {
-          // Check for date overlap
-          const subStart = sub.date_start || sub.target_date;
-          const subEnd = sub.date_end || sub.target_date;
-          const newStart = dateStart || targetDate;
-          const newEnd = dateEnd || targetDate;
-          
-          console.log('Checking date overlap:', {
-            existing: { start: subStart, end: subEnd },
-            new: { start: newStart, end: newEnd }
-          });
-          
-          if (!(newEnd < subStart || newStart > subEnd)) {
-            console.log('Found overlapping date range');
-            return res.status(400).json({ 
-              error: 'קיים מינוי פעיל עם תאריכים חופפים' 
-            });
-          }
-        }
       }
     }
 
