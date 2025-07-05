@@ -644,47 +644,103 @@ exports.handler = async (event, context) => {
           .select('*')
           .eq('status', 'active')
         
-        if (!subError && subscriptions && subscriptions.length > 0) {
+        if (subError) {
+          console.error('📧 ❌ Error fetching subscriptions:', subError)
+          emailResult = {
+            processed: false,
+            message: `Database error: ${subError.message}`,
+            error: subError
+          }
+        } else if (!subscriptions || subscriptions.length === 0) {
+          console.log('📧 ℹ️ No active subscriptions found')
+          emailResult = {
+            processed: true,
+            message: 'No active subscriptions',
+            emailsQueued: 0,
+            emailsSkipped: 0
+          }
+        } else {
           console.log(`📧 Found ${subscriptions.length} active subscriptions`)
           
           // Process each subscription (simplified version)
           let emailsQueued = 0
           let emailsSkipped = 0
+          let errors = []
           
           for (const subscription of subscriptions) {
-            // Check if we've already sent these appointments
-            const appointmentIds = appointmentResults.appointments.map(a => `${a.date}_${a.times.join('_')}`)
-            
-            const { data: sentAppointments } = await supabase
-              .from('sent_appointments')
-              .select('appointment_id')
-              .eq('notification_id', subscription.id)
-              .in('appointment_id', appointmentIds)
-            
-            const sentIds = new Set((sentAppointments || []).map(s => s.appointment_id))
-            const newAppointments = appointmentResults.appointments.filter(a => 
-              !sentIds.has(`${a.date}_${a.times.join('_')}`)
-            )
-            
-            if (newAppointments.length > 0) {
-              console.log(`📧 Queueing email for ${subscription.email} with ${newAppointments.length} new appointments`)
-              emailsQueued++
+            try {
+              console.log(`📧 Processing subscription ${subscription.id} for ${subscription.email}`)
               
-              // Queue email (simplified - just log for now)
-              await supabase
-                .from('email_queue')
-                .insert({
-                  to: subscription.email,
-                  subject: `${newAppointments.length} New Appointments Available - Tor Ramel`,
-                  template: 'appointment_notification',
-                  data: {
-                    appointments: newAppointments,
-                    notificationId: subscription.id
-                  },
-                  status: 'pending'
-                })
-            } else {
-              emailsSkipped++
+              // Check if we've already sent these appointments
+              const appointmentIds = appointmentResults.appointments.map(a => `${a.date}_${a.times.join('_')}`)
+              console.log(`📧 Checking ${appointmentIds.length} appointment IDs for duplicates`)
+              
+              const { data: sentAppointments, error: sentError } = await supabase
+                .from('sent_appointments')
+                .select('appointment_id')
+                .eq('notification_id', subscription.id)
+                .in('appointment_id', appointmentIds)
+              
+              if (sentError) {
+                console.error(`📧 ❌ Error checking sent appointments:`, sentError)
+                errors.push(`Sent check error for ${subscription.email}: ${sentError.message}`)
+                continue
+              }
+              
+              const sentIds = new Set((sentAppointments || []).map(s => s.appointment_id))
+              const newAppointments = appointmentResults.appointments.filter(a => 
+                !sentIds.has(`${a.date}_${a.times.join('_')}`)
+              )
+              
+              console.log(`📧 Found ${newAppointments.length} new appointments for ${subscription.email} (${sentIds.size} already sent)`)
+              
+              if (newAppointments.length > 0) {
+                console.log(`📧 Queueing email for ${subscription.email} with ${newAppointments.length} new appointments`)
+                
+                // Queue email
+                const { data: queueData, error: queueError } = await supabase
+                  .from('email_queue')
+                  .insert({
+                    to: subscription.email,
+                    subject: `${newAppointments.length} New Appointments Available - Tor Ramel`,
+                    template: 'appointment_notification',
+                    data: {
+                      appointments: newAppointments,
+                      notificationId: subscription.id
+                    },
+                    status: 'pending',
+                    created_at: new Date().toISOString()
+                  })
+                
+                if (queueError) {
+                  console.error(`📧 ❌ Error queueing email:`, queueError)
+                  errors.push(`Queue error for ${subscription.email}: ${queueError.message}`)
+                } else {
+                  console.log(`📧 ✅ Email queued successfully for ${subscription.email}`)
+                  emailsQueued++
+                  
+                  // Mark appointments as sent
+                  const sentRecords = newAppointments.map(apt => ({
+                    notification_id: subscription.id,
+                    appointment_id: `${apt.date}_${apt.times.join('_')}`,
+                    sent_at: new Date().toISOString()
+                  }))
+                  
+                  const { error: markError } = await supabase
+                    .from('sent_appointments')
+                    .insert(sentRecords)
+                  
+                  if (markError) {
+                    console.error(`📧 ⚠️ Warning: Failed to mark appointments as sent:`, markError)
+                  }
+                }
+              } else {
+                console.log(`📧 ⏭️ Skipping ${subscription.email} - no new appointments`)
+                emailsSkipped++
+              }
+            } catch (subError) {
+              console.error(`📧 ❌ Error processing subscription ${subscription.id}:`, subError)
+              errors.push(`Processing error for ${subscription.email}: ${subError.message}`)
             }
           }
           
@@ -692,19 +748,23 @@ exports.handler = async (event, context) => {
             processed: true,
             message: `Processed ${subscriptions.length} subscriptions`,
             emailsQueued,
-            emailsSkipped
+            emailsSkipped,
+            errors: errors.length > 0 ? errors : undefined
           }
           
-          console.log(`📧 Email processing complete: ${emailsQueued} queued, ${emailsSkipped} skipped`)
+          console.log(`📧 Email processing complete: ${emailsQueued} queued, ${emailsSkipped} skipped, ${errors.length} errors`)
         }
       } catch (emailError) {
-        console.error('📧 Email processing error:', emailError)
+        console.error('📧 ❌ Fatal email processing error:', emailError)
+        console.error('📧 ❌ Error stack:', emailError.stack)
         emailResult = {
           processed: false,
           message: `Email error: ${emailError.message}`,
           error: emailError.message
         }
       }
+    } else {
+      console.log('📧 ℹ️ No appointments found, skipping email processing')
     }
     
     const totalTime = Math.round((Date.now() - functionStart) / 1000)
