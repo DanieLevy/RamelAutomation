@@ -3,7 +3,7 @@ import Layout from '@/components/Layout';
 import OpportunityBanner from '@/components/OpportunityBanner';
 import UserOTPAuth from '@/components/UserOTPAuth';
 import { Button } from '@/components/ui/button';
-import { Search, Plus, Bell } from 'lucide-react';
+import { Search, Plus, Bell, Settings } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function Home() {
@@ -89,6 +89,15 @@ export default function Home() {
                   >
                     <Bell className="w-5 h-5 ml-2" />
                     הרשמה להתראות
+                  </Button>
+                  
+                  <Button
+                    onClick={() => router.push('/manage')}
+                    variant="default"
+                    className="h-11 bg-primary/90 hover:bg-primary text-primary-foreground justify-start"
+                  >
+                    <Settings className="w-4 h-4 ml-2" />
+                    ניהול ההתראות שלי
                   </Button>
                   
                   <Button

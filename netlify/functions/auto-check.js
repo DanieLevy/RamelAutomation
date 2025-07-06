@@ -833,4 +833,9 @@ exports.handler = async (event, context) => {
       })
     }
   }
+}
+
+// Schedule configuration for Netlify
+exports.config = {
+  schedule: "@every 5m"  // Run every 5 minutes
 } 

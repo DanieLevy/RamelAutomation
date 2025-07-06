@@ -70,10 +70,12 @@ Or add `ENV_DEBUG=true` as an environment variable in Netlify for detailed logs.
 - [Environment Variables Setup](./NETLIFY_ENV_SETUP.md)
 - [Scheduled Functions](./NETLIFY_SCHEDULED_FUNCTIONS.md)
 - [Notification System](./SIMPLIFIED_NOTIFICATION_SYSTEM.md)
+- [Email Queue System](./EMAIL_QUEUE_SYSTEM.md)
 
 ## 🔧 Scripts
 
 - `npm run dev` - Start development server
 - `npm run build` - Build for production
 - `npm run debug:env` - Debug environment variables
-- `npm run validate:env` - Validate all required variables are set 
+- `npm run validate:env` - Validate all required variables are set
+ 

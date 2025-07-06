@@ -6,29 +6,11 @@
 [build.environment]
   NODE_VERSION = "18"
   NEXT_USE_NETLIFY_EDGE = "false"
+  NETLIFY_NEXT_PLUGIN_SKIP_EDGE_FUNCTIONS = "true"
 
-# Required environment variables (set these in Netlify dashboard)
-# The build will fail if these are not set
-[context.production.environment]
-  # Supabase credentials (REQUIRED)
-  SUPABASE_URL = "REQUIRED - Set in Netlify dashboard"
-  NEXT_PUBLIC_SUPABASE_URL = "REQUIRED - Set in Netlify dashboard" 
-  SUPABASE_SERVICE_ROLE_KEY = "REQUIRED - Set in Netlify dashboard"
-  SUPABASE_ANON_KEY = "REQUIRED - Set in Netlify dashboard"
-  NEXT_PUBLIC_SUPABASE_ANON_KEY = "REQUIRED - Set in Netlify dashboard"
-  
-  # Email configuration (REQUIRED)
-  EMAIL_SENDER = "REQUIRED - Set in Netlify dashboard"
-  EMAIL_APP_PASSWORD = "REQUIRED - Set in Netlify dashboard"
-  
-  # App configuration (REQUIRED)
-  NEXT_PUBLIC_BASE_URL = "REQUIRED - Set in Netlify dashboard"
-  USER_ID = "REQUIRED - Set in Netlify dashboard"
-  CODE_AUTH = "REQUIRED - Set in Netlify dashboard"
-  
-  # Security tokens (auto-generated if not set)
-  CRON_SECRET = "d47a7f5b61be83cb1d5de7f3c38fbf3ef6b5d2d1407f9874b159a0c36f76025d"
-  ADMIN_SECRET = "f1039cc377c4a66a8167e943defe23a7e687d13b8cf11a2be91761dc39500234"
+# Required environment variables
+# Set these in Netlify dashboard, NOT in this file!
+# Having them here with placeholder values causes build errors
 
 # Use Next.js plugin for automatic handling
 [[plugins]]

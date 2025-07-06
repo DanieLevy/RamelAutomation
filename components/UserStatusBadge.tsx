@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { User, ChevronDown, LogOut } from 'lucide-react';
+import { User, ChevronDown, LogOut, Settings } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/router';
 import {
   Popover,
   PopoverContent,
@@ -11,6 +12,7 @@ import { Separator } from '@/components/ui/separator';
 
 export default function UserStatusBadge() {
   const { userEmail, clearAuth } = useAuth();
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
 
   if (!userEmail) return null;
@@ -54,6 +56,18 @@ export default function UserStatusBadge() {
             <div className="font-medium text-sm break-all">{userEmail}</div>
           </div>
           <Separator />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start"
+            onClick={() => {
+              router.push('/manage');
+              setIsOpen(false);
+            }}
+          >
+            <Settings className="w-4 h-4 ml-2" />
+            ניהול התראות
+          </Button>
           <Button
             variant="ghost"
             size="sm"

@@ -1,126 +1,125 @@
-# Netlify Scheduled Functions Setup
+# Netlify Scheduled Functions Documentation
 
-## Important Update (July 2025)
+## Overview
 
-**Due to function timeout issues and excessive invocations burning through the 125k monthly limit, we've simplified the architecture:**
+This project uses Netlify Scheduled Functions for automated background tasks.
 
-- ✅ **Kept**: `auto-check.js` - The main function that checks for appointments and processes emails (integrated)
+### Current Scheduled Functions:
+
+1. **auto-check.js** - Appointment availability checker with integrated email processing (runs every 5 minutes)
+
+## Functions
+
+### 1. Auto-Check Function (`auto-check.js`)
+
+**Schedule**: Every 5 minutes (`@every 5m`)
+
+**Purpose**: 
+- Checks barbershop website for available appointments
+- Updates cache with latest availability
+- Processes notification subscriptions
+- Queues notification emails when appointments become available
+- Processes email queue inline (integrated)
+
+**Key Features**:
+- Intelligent caching to reduce API calls
+- Adaptive batching for performance
+- Strict 9-second execution limit (stays under Netlify's 10-second max)
+- Checks 30 days ahead (excluding closed days)
+- Integrated email processing to reduce function invocations
+
+## How It Works
+
+The `auto-check.js` function handles everything in a single, optimized process:
+
+1. **Appointment Checking** (0-9 seconds):
+   - Checks up to 30 days of appointments
+   - Uses intelligent caching to avoid redundant checks
+   - Stops at 9 seconds to ensure completion
+
+2. **Email Processing** (integrated):
+   - If appointments are found, immediately processes subscriptions
+   - Queues emails for new appointments
+   - Marks appointments as sent to avoid duplicates
+
+3. **Performance Optimizations**:
+   - Adaptive batch sizing based on response times
+   - Aggressive caching with 2-minute TTL
+   - Parallel operations where possible
+
+## Removed Functions
+
+- ❌ **Removed**: `process-emails.js` - Email processing is now integrated into auto-check.js
 - ❌ **Removed**: `process-email-queue.js`, `data-cleanup.js`, `process-cached-notifications.js` - These were timing out and causing excessive retries
 
-## Current Architecture
+## Testing Scheduled Functions
 
-The system now runs with a single Netlify function:
-- `auto-check.js` - Checks appointments AND processes email notifications in one go (under 8 seconds)
+### Local Testing
 
-## Setting Up Scheduled Execution
-
-Since Netlify doesn't support scheduled functions in `netlify.toml`, you need to use external services:
-
-### Option 1: GitHub Actions (Recommended - FREE)
-
-Create `.github/workflows/scheduled-checks.yml`:
-
-```yaml
-name: Scheduled Appointment Checks
-
-on:
-  schedule:
-    # Run every 5 minutes
-    - cron: '*/5 * * * *'
-  workflow_dispatch: # Allow manual triggers
-
-jobs:
-  check-appointments:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Trigger Auto-Check Function
-        run: |
-          curl -X GET "https://tor-ramel.netlify.app/.netlify/functions/auto-check" \
-            -H "Accept: application/json" \
-            --fail \
-            --max-time 30
-      
-      - name: Log Result
-        if: always()
-        run: echo "Check completed at $(date)"
-```
-
-### Option 2: Cron-job.org (FREE)
-
-1. Go to [cron-job.org](https://cron-job.org)
-2. Create a free account
-3. Create a new cron job:
-   - **URL**: `https://tor-ramel.netlify.app/.netlify/functions/auto-check`
-   - **Schedule**: Every 5 minutes
-   - **Method**: GET
-   - **Timeout**: 30 seconds
-
-### Option 3: UptimeRobot (FREE up to 50 monitors)
-
-1. Sign up at [uptimerobot.com](https://uptimerobot.com)
-2. Create a new monitor:
-   - **Monitor Type**: HTTP(s)
-   - **URL**: `https://tor-ramel.netlify.app/.netlify/functions/auto-check`
-   - **Monitoring Interval**: 5 minutes
-
-### Option 4: Google Cloud Scheduler (FREE tier available)
-
+Test the auto-check function (includes email processing):
 ```bash
-# Create a Cloud Scheduler job
-gcloud scheduler jobs create http auto-check-appointments \
-  --schedule="*/5 * * * *" \
-  --uri="https://tor-ramel.netlify.app/.netlify/functions/auto-check" \
-  --http-method=GET \
-  --time-zone="Asia/Jerusalem" \
-  --attempt-deadline="30s"
-```
-
-## Function Invocation Limits
-
-With the simplified architecture:
-- Each check = 1 function invocation
-- 5-minute intervals = 12 checks/hour = 288 checks/day = ~8,640 checks/month
-- **Well under the 125k monthly limit** ✅
-
-## Email Processing
-
-Email processing is now integrated into the `auto-check` function:
-1. Checks for appointments
-2. Identifies active subscriptions
-3. Queues emails for new appointments only
-4. Tracks sent appointments to prevent duplicates
-5. All within the 8-second execution window
-
-## Manual Testing
-
-Test the function locally:
-```bash
-# Using curl
-curl https://tor-ramel.netlify.app/.netlify/functions/auto-check
-
-# Using Netlify CLI
 netlify functions:invoke auto-check
 ```
 
+### Production Testing
+
+The function runs automatically every 5 minutes in production, but you can also trigger it manually:
+
+- Manual trigger: `https://your-site.netlify.app/.netlify/functions/auto-check`
+
 ## Monitoring
 
-Monitor function performance in the Netlify dashboard:
-- Functions tab → View logs
-- Check execution times (should be < 8 seconds)
-- Monitor monthly usage to stay under 125k invocations
+Check function execution in Netlify:
+1. Go to your site dashboard
+2. Navigate to Functions → Scheduled
+3. View execution logs and metrics
+
+## Configuration
+
+Scheduled functions are configured using the `exports.config` object:
+
+```javascript
+exports.config = {
+  schedule: "@every 5m"  // Runs every 5 minutes
+}
+```
+
+### Available Schedule Formats:
+- `@hourly` - Every hour
+- `@daily` - Every day at midnight
+- `@weekly` - Every week
+- `@monthly` - Every month
+- `@yearly` - Every year
+- `@every 15m` - Every 15 minutes
+- Cron expressions: `0 */2 * * *` (every 2 hours)
+
+## Best Practices
+
+1. **Keep functions fast**: Netlify has a 10-second timeout for scheduled functions
+2. **Use caching**: Reduce external API calls by caching results
+3. **Handle errors gracefully**: Functions should not crash on errors
+4. **Log appropriately**: Use console.log for debugging, but avoid excessive logging
+5. **Test locally first**: Use `netlify dev` and `netlify functions:invoke`
 
 ## Troubleshooting
 
-If you see excessive invocations:
-1. Check external schedulers aren't running multiple instances
-2. Ensure no retry logic is causing loops
-3. Monitor function logs for errors
-4. Consider increasing check interval if needed
+### Function Not Running?
 
-## Future Improvements
+1. Check the function has `exports.config` with a valid schedule
+2. Verify the function is deployed (check Functions tab in Netlify)
+3. Check logs for errors
 
-If you need more complex scheduling:
-1. Consider moving to Vercel (built-in cron support)
-2. Use AWS Lambda with EventBridge
-3. Deploy a dedicated cron service
-4. Use Supabase Edge Functions with pg_cron 
+### Function Timing Out?
+
+1. Optimize code to run faster
+2. Reduce batch sizes
+3. Implement caching
+4. Use parallel processing where possible
+
+### Emails Not Being Sent?
+
+1. Check environment variables are set (EMAIL_SENDER, EMAIL_APP_PASSWORD)
+2. Verify database connection
+3. Check the email_queue table for pending emails
+4. Review function logs for email processing errors
+5. Ensure appointments are actually being found 

@@ -17,6 +17,8 @@ import {
   DialogClose
 } from '../components/ui/dialog';
 import { Calendar as CalendarIcon, Clock, Search, Smartphone, Wifi, WifiOff, Share2, Copy, Download, MapPin, ExternalLink, Settings, Bell } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import Layout from '@/components/Layout';
 
 // Validate environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -62,6 +64,7 @@ interface AppointmentResponse {
 
 export default function ManagePage() {
   const router = useRouter();
+  const { userEmail: authenticatedEmail, authToken, clearAuth } = useAuth();
   const { email, token } = router.query;
   const [loading, setLoading] = useState(true);
   const [subscriptions, setSubscriptions] = useState<NotificationData[]>([]);
@@ -89,8 +92,15 @@ export default function ManagePage() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
-    // If token is in URL, validate and store it
-    if (token && typeof token === 'string') {
+    // First, check if user is authenticated via AuthContext
+    if (authenticatedEmail) {
+      console.log('User authenticated via AuthContext:', authenticatedEmail);
+      setUserEmail(authenticatedEmail);
+      setSearchEmail(authenticatedEmail);
+      setTokenValidated(true);
+      loadSubscriptions(authenticatedEmail);
+    } else if (token && typeof token === 'string') {
+      // If token is in URL, validate and store it
       validateTokenAndLoadData(token, true);
     } else if (email && typeof email === 'string') {
       // Legacy email-based access (deprecated)
@@ -106,7 +116,7 @@ export default function ManagePage() {
       setLoading(false);
       }
     }
-  }, [email, token]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [email, token, authenticatedEmail]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (otpResendTimer > 0) {
@@ -463,6 +473,8 @@ export default function ManagePage() {
     if (typeof window !== 'undefined') {
       localStorage.removeItem(LOCAL_STORAGE_TOKEN_KEY);
     }
+    // Clear auth from context
+    clearAuth();
     setTokenValidated(false);
     setUserEmail(null);
     setSearchEmail('');
@@ -481,31 +493,8 @@ export default function ManagePage() {
 
   // --- RENDER ---
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      {/* Modern Header */}
-      <header className="w-full border-b border-border bg-card/95 shadow-sm z-50">
-        <div className="max-w-screen-sm mx-auto px-4 py-3 flex items-center justify-between gap-2" dir="rtl">
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <img src="/icons/icon-72x72.png" alt="תור רם-אל" className="w-10 h-10 rounded-xl shadow-sm" />
-              <div className="absolute inset-0 rounded-xl bg-gradient-to-tr from-white/20 to-transparent dark:from-black/20"></div>
-            </div>
-            <div>
-              <h1 className="text-lg font-bold leading-none mb-0.5">ניהול התראות</h1>
-              <p className="text-xs text-muted-foreground">ניהול התראות במספרת רם-אל</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <ThemeToggle className="w-7 h-7" />
-            <Button onClick={() => router.push('/')} variant="ghost" size="icon" aria-label="חזרה לדף הבית" title="חזרה לדף הבית">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-            </Button>
-            {tokenValidated && (
-              <Button onClick={handleLogout} variant="outline" size="sm" className="ml-2">התנתק</Button>
-            )}
-          </div>
-        </div>
-      </header>
+    <Layout title="ניהול התראות">
+      <div className="min-h-screen flex flex-col bg-background">
       <main className="flex-1">
         {/* Show loader while checking session (before any UI) */}
         {loading ? (
@@ -516,8 +505,8 @@ export default function ManagePage() {
         ) : (
           <>
             {/* Header */}
-            {/* Secure Access Form Header/Description - only show if not tokenValidated */}
-            {!tokenValidated && !otpSent && (
+            {/* Secure Access Form Header/Description - only show if not tokenValidated and not authenticated via context */}
+            {!tokenValidated && !otpSent && !authenticatedEmail && (
               <div className="container mx-auto px-4 py-6">
                 <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6 flex items-center gap-3">
                   <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -547,7 +536,7 @@ export default function ManagePage() {
               </div>
             )}
             {/* OTP Input Form */}
-            {otpSent && !tokenValidated && (
+            {otpSent && !tokenValidated && !authenticatedEmail && (
               <div className="container mx-auto px-4 py-6">
                 <form onSubmit={handleOtpSubmit} className="space-y-4 max-w-md mx-auto flex flex-col items-center py-8">
                   <div className="flex flex-col items-center gap-2 w-full">
@@ -591,6 +580,32 @@ export default function ManagePage() {
               </div>
             )}
 
+            {/* User Info Bar - Show for authenticated users */}
+            {(authenticatedEmail || userEmail) && (
+              <div className="container mx-auto px-4 py-4">
+                <div className="bg-card border border-border rounded-lg p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    <span className="text-sm text-muted-foreground">מחובר כ:</span>
+                    <span className="font-medium">{authenticatedEmail || userEmail}</span>
+                  </div>
+                  <Button 
+                    onClick={handleLogout} 
+                    variant="ghost" 
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    התנתק
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Main Content */}
             <div className="container mx-auto px-4 py-8">
               {error && (
@@ -624,7 +639,7 @@ export default function ManagePage() {
                     </div>
                   )}
 
-                  {subscriptions.length === 0 && tokenValidated && !loading && (
+                  {subscriptions.length === 0 && (tokenValidated || authenticatedEmail) && !loading && (
                     <div className="flex flex-col items-center justify-center py-16">
                       <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
                         <svg className="w-8 h-8 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -894,13 +909,6 @@ export default function ManagePage() {
         )}
       </main>
 
-      {/* Footer */}
-      <div className="border-t border-border mt-12">
-        <div className="container mx-auto px-4 py-6 text-center text-sm text-muted-foreground">
-          © 2024 מספרת רם-אל • מערכת התראות אוטומטית
-        </div>
-      </div>
-
       <Dialog open={detailsDialogOpen} onOpenChange={setDetailsDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -1006,5 +1014,6 @@ export default function ManagePage() {
         </DialogContent>
       </Dialog>
     </div>
+    </Layout>
   );
 } 
